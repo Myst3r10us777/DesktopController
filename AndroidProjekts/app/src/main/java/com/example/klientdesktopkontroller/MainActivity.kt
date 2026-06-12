@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startFrameTimeoutChecker() {
-        frameTimeoutJob?.cancel() // Отменяем предыдущий job если есть
+        frameTimeoutJob?.cancel()
         frameTimeoutJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
                 delay(frameTimeoutCheckInterval)
@@ -158,7 +158,6 @@ class MainActivity : AppCompatActivity() {
             keyboardInputField.setText("")
             keyboardInputField.requestFocus()
 
-            // Для экранной клавиатуры (галочка/Enter/Done)
             keyboardInputField.setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_DONE ||
                     actionId == EditorInfo.IME_ACTION_SEND ||
@@ -168,7 +167,6 @@ class MainActivity : AppCompatActivity() {
                     val inputMethodManager = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                     inputMethodManager.hideSoftInputFromWindow(keyboardInputField.windowToken, 0)
 
-                    // Скрываем поле
                     keyboardInputField.visibility = View.GONE
                     keyboardInputField.setText("")
                     true
@@ -177,7 +175,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Для аппаратной клавиатуры (опционально)
             keyboardInputField.setOnKeyListener { _, keyCode, event ->
                 if (keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP) {
                     sendTextToServer()
@@ -561,7 +558,7 @@ class MainActivity : AppCompatActivity() {
                     val currentTime = System.currentTimeMillis()
 
                     if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
-                        dClick = true // Устанавливаем флаг двойного нажатия
+                        dClick = true
                         cancelLongPress()
 
                         val absoluteCoords = convertToAbsoluteCoords(x, y)
@@ -590,7 +587,7 @@ class MainActivity : AppCompatActivity() {
                         val scrollDelta = event.y - lastScrollY
 
                         if (abs(scrollDelta) > scrollThreshold) {
-                            val scrollDirection = if (scrollDelta > 0) "up" else "down"
+                            val scrollDirection = if (scrollDelta > 0) "down" else "up"
 
                             val imageCoords = getImageCoordinates(event.x, event.y)
                             imageCoords?.let { (x, y) ->
