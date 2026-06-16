@@ -1,0 +1,81 @@
+package com.example.klientdesktopkontroller
+
+import android.util.Log
+import android.widget.Toast
+import org.java_websocket.client.WebSocketClient
+import org.java_websocket.handshake.ServerHandshake
+import java.lang.Exception
+import java.net.URI
+import org.json.JSONObject
+
+class WebSocketClient(
+    serverUri: URI,
+    private val listener: Listener
+) : org.java_websocket.client.WebSocketClient(serverUri) {
+
+    interface Listener {
+        fun onMessage(message: String)
+        fun onClosing(code: Int, reason: String?)
+        fun onFailure(t: Throwable)
+    }
+
+    private var currentMonitor = 1
+
+    fun sendClick(absoluteX: Int, absoluteY: Int, button: Int, action: String, type: String) {
+        try {
+            val json = JSONObject().apply {
+                put("type", "click")
+                put("x", absoluteX)
+                put("y", absoluteY)
+                put("button", button)
+                put("action", action)
+                put("click_type", type)
+                put("monitor", currentMonitor)
+            }
+
+            send(json.toString())
+            Log.d("WebSocket", "🖱️ Отправлен абсолютный клик: $action ($type) at $absoluteX,$absoluteY")
+        } catch (e: Exception) {
+            Log.e("WebSocket", "❌ Ошибка отправки клика", e)
+        }
+    }
+
+    fun sendText(text: String) {
+        try {
+            val json = JSONObject()
+                .put("type", "text")
+                .put("text", text)
+            send(json.toString())
+        } catch (e: Exception) {
+            Log.e("WebSocket", "❌ Ошибка отправки текста", e)
+        }
+    }
+
+    fun switchDesktop(desktopNumber: Int) {
+        try {
+            val json = JSONObject()
+                .put("type", "monitor")
+                .put("data", desktopNumber)
+            send(json.toString())
+            currentMonitor=desktopNumber
+        } catch (e: java.lang.Exception) {
+            Log.e("WebSocket", "❌ Ошибка переключения монитора", e)
+        }
+    }
+
+    override fun onOpen(handshakedata: ServerHandshake?) {
+        Log.d("WebSocket", "Подключение установлено")
+    }
+
+    override fun onMessage(message: String?) {
+        message?.let { listener.onMessage(it) }
+    }
+
+    override fun onClose(code: Int, reason: String?, remote: Boolean) {
+        listener.onClosing(code, reason)
+    }
+
+    override fun onError(ex: Exception?) {
+        ex?.let { listener.onFailure(it) }
+    }
+}

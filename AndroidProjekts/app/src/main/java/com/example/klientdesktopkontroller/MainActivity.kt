@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
 
     private var longPressRunnable: Runnable? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val LONG_PRESS_DELAY = 1000L // 1 секунда
+    private val LONG_PRESS_DELAY = 1000L
     private var isLongPressTriggered = false
 
     private var lastTapTime = 0L
@@ -81,14 +81,13 @@ class MainActivity : AppCompatActivity() {
 
     private var dClick = false
     private var lastFrameTime = 0L
-    private val frameTimeout = 1000L // 1 секунда
-    private val frameTimeoutCheckInterval = 500L // Проверяем каждые 500мс
+    private val frameTimeout = 3000L
+    private val frameTimeoutCheckInterval = 500L
     private var frameTimeoutJob: Job? = null
 
-    // Матрица для трансформаций изображения
     private val matrix = Matrix()
 
-    private var scrollThreshold = 5f
+    private var scrollThreshold = 20f
     private var lastScrollY = 0f
 
     private var currentMonitor = 1
@@ -107,6 +106,7 @@ class MainActivity : AppCompatActivity() {
         private val COMMON_IPS = listOf("192.168.0.120")
     }
 
+    //определение кнопок и т.п
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -136,6 +136,7 @@ class MainActivity : AppCompatActivity() {
         startFrameTimeoutChecker()
     }
 
+    //проверка работоспособности сервера по счету кадров
     private fun startFrameTimeoutChecker() {
         frameTimeoutJob?.cancel()
         frameTimeoutJob = CoroutineScope(Dispatchers.IO).launch {
@@ -152,6 +153,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun Keyboard() {
         runOnUiThread {
             keyboardInputField.visibility = View.VISIBLE
@@ -187,6 +189,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    //отправка текста с клавы на сервер
     private fun sendTextToServer() {
         val text = keyboardInputField.text.toString().trim()
         if (text.isNotEmpty()) {
@@ -208,6 +211,8 @@ class MainActivity : AppCompatActivity() {
             true
         }
     }
+
+    //зум
     private fun setupZoomGestures() {
         scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -233,6 +238,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    //подогнать масштаб под телефон
     private fun applyImageTransform() {
         val drawable = imageView.drawable ?: return
         matrix.reset()
@@ -279,6 +285,7 @@ class MainActivity : AppCompatActivity() {
         if (hasFocus) hideSystemBars()
     }
 
+    //подключение к серверу
     private fun startAutoDiscovery() {
         button.isEnabled = false
 
@@ -332,7 +339,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun connectToWebSocket(uri: URI) {
         lastFrameTime = System.currentTimeMillis()
-        //startFrameTimeoutChecker()
+        startFrameTimeoutChecker()
         currentMonitor = 1
         navigationView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
@@ -465,17 +472,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    //сообщение при оставновке сервера
     private fun handleServerStopped() {
         frameTimeoutJob?.cancel()
         Log.e(TAG, "Сервер остановился!")
         lastFrameTime = 0L
+
         runOnUiThread {
             imageView.setImageBitmap(null)
             imageView.visibility = View.GONE
 
-            text.text = "Сервер остановлен, подождите пока его запустят!"
-            button.text = "Попробовать подключиться"
-            button.isEnabled = true
+            text.text = "Связь с сервером потеряна. Пытаемся повторно подключиться"
+            button.isEnabled = false
             menuButton.isEnabled = false
             menuButton.visibility = View.GONE
 
@@ -489,6 +497,12 @@ class MainActivity : AppCompatActivity() {
 
             keyboardInputField.visibility = View.GONE
             keyboardInputField.setText("")
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                if(!isDestroyed){
+                    startAutoDiscovery()
+                }
+            }, 4000)
         }
     }
 
@@ -527,6 +541,7 @@ class MainActivity : AppCompatActivity() {
 
         return Pair(absoluteX, absoluteY)
     }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
 
@@ -575,39 +590,43 @@ class MainActivity : AppCompatActivity() {
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (isDragging && !dClick) {
-                    val dx = event.x - lastTouchX
-                    val dy = event.y - lastTouchY
+                try{
+                    if (isDragging && !dClick) {
+                        val dx = event.x - lastTouchX
+                        val dy = event.y - lastTouchY
 
-                    if (dx > 5 || dx < -5 || dy > 5 || dy < -5) {
-                        cancelLongPress()
-                    }
-
-                    if (!dClick && (scaleFactor == 1f)) {
-                        val scrollDelta = event.y - lastScrollY
-
-                        if (abs(scrollDelta) > scrollThreshold) {
-                            val scrollDirection = if (scrollDelta > 0) "down" else "up"
-
-                            val imageCoords = getImageCoordinates(event.x, event.y)
-                            imageCoords?.let { (x, y) ->
-                                val absoluteCoords = convertToAbsoluteCoords(x, y)
-                                absoluteCoords?.let { (absX, absY) ->
-                                    websocketClient?.sendClick(absX, absY, 0, scrollDirection, "wheel")
-                                    Log.d(TAG, "Скролл: $scrollDirection at $absX,$absY")
-                                }
-                            }
-
-                            lastScrollY = event.y
+                        if (dx > 5 || dx < -5 || dy > 5 || dy < -5) {
+                            cancelLongPress()
                         }
+
+                        if (!dClick && (scaleFactor == 1f)) {
+                            val scrollDelta = event.y - lastScrollY
+
+                            if (abs(scrollDelta) > scrollThreshold) {
+                                val scrollDirection = if (scrollDelta > 0) "down" else "up"
+
+                                val imageCoords = getImageCoordinates(event.x, event.y)
+                                imageCoords?.let { (x, y) ->
+                                    val absoluteCoords = convertToAbsoluteCoords(x, y)
+                                    absoluteCoords?.let { (absX, absY) ->
+                                        websocketClient?.sendClick(absX, absY, 0, scrollDirection, "wheel")
+                                        Log.d(TAG, "Скролл: $scrollDirection at $absX,$absY")
+                                    }
+                                }
+
+                                lastScrollY = event.y
+                            }
+                        }
+
+                        posX += dx
+                        posY += dy
+                        applyImageTransform()
+
+                        lastTouchX = event.x
+                        lastTouchY = event.y
                     }
-
-                    posX += dx
-                    posY += dy
-                    applyImageTransform()
-
-                    lastTouchX = event.x
-                    lastTouchY = event.y
+                } catch (e: Exception){
+                    Log.e(TAG, "Ошибка при скролле", e)
                 }
             }
 
