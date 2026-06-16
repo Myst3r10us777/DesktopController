@@ -289,10 +289,10 @@ class StreamerApp:
 
     def setup_ui(self):
         style = ttk.Style()
-        style.configure("Blue.TFrame", background="#171717")
-        style.configure("Title.TLabel", background="#171717", foreground="#818181", font=("Segoe UI", 25, "bold"))
-        style.configure("Orange.TLabel", background="#171717", foreground="#818181", font=("Segoe UI", 15))
-        style.configure("Status.TLabel", background="#171717", foreground="red", font=("Segoe UI", 15))
+        style.configure("Blue.TFrame", background="#131418")
+        style.configure("Title.TLabel", background="#131418", foreground="#f3f3f3", font=("Segoe UI", 25, "bold"))
+        style.configure("Orange.TLabel", background="#131418", foreground="#0ea3fc", font=("Segoe UI", 15))
+        style.configure("Status.TLabel", background="#131418", foreground="red", font=("Segoe UI", 15))
         style.configure("Large.TButton", font=("Arial", 15))
 
         main_frame = ttk.Frame(self.root, padding="20", style="Blue.TFrame")
