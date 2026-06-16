@@ -413,10 +413,10 @@ class StreamerApp:
 
     def setup_ui(self):
         style = ttk.Style()
-        style.configure("Blue.TFrame", background="#00fff2")
-        style.configure("Title.TLabel", background="#00fff2", foreground="#9131FF", font=("Segoe UI", 25, "bold"))
-        style.configure("Orange.TLabel", background="#00fff2", foreground="#61179C", font=("Segoe UI", 15))
-        style.configure("Status.TLabel", background="#00fff2", foreground="red", font=("Segoe UI", 15))
+        style.configure("Blue.TFrame", background="#131418")
+        style.configure("Title.TLabel", background="#131418", foreground="#f3f3f3", font=("Segoe UI", 25, "bold"))
+        style.configure("Orange.TLabel", background="#131418", foreground="#0ea3fc", font=("Segoe UI", 15))
+        style.configure("Status.TLabel", background="#131418", foreground="red", font=("Segoe UI", 15))
         style.configure("Large.TButton", font=("Arial", 15))
 
         main_frame = ttk.Frame(self.root, padding="20", style="Blue.TFrame")
@@ -426,7 +426,7 @@ class StreamerApp:
 
         ttk.Label(main_frame, 
                  text="◆ Как использовать:\nУбедитесь что сервер и клиент находятся в одной сети Wi-Fi\n"
-                      "\n◆ В меню можно:\n• Переключить просматриваемый Рабочий стол\n"
+                      "\n◆ В меню можно:\n• Переключить просматриваемый монитор\n"
                       "• Вставить текст",
                  style="Orange.TLabel").pack(pady=5)
 
