@@ -12,6 +12,120 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 
+import socket
+import json
+import threading
+import time
+
+class DiscoveryServer:
+    """UDP сервер для обнаружения в локальной сети"""
+    
+    def __init__(self):
+        self.running = False
+        self.sock = None
+        self.thread = None
+        self.DISCOVERY_PORT = 8766
+        self.DISCOVERY_MESSAGE = "DISCOVER_DESKTOP_CONTROLLER"
+        self.server_ip = None
+        
+    def start(self):
+        """Запускает UDP сервер в отдельном потоке"""
+        if self.running:
+            print("⚠️ Discovery сервер уже запущен")
+            return
+            
+        self.running = True
+        self.thread = threading.Thread(target=self._listen, daemon=True)
+        self.thread.start()
+        print(f"🔍 UDP Discovery запущен на порту {self.DISCOVERY_PORT}")
+    
+    def _listen(self):
+        """Основной цикл прослушивания discovery запросов"""
+        try:
+            # Создаем UDP сокет
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            
+            # Привязываемся ко всем интерфейсам
+            self.sock.bind(('', self.DISCOVERY_PORT))
+            self.sock.settimeout(1.0)  # Таймаут для неблокирующего режима
+            
+            print(f"📡 Слушаю порт {self.DISCOVERY_PORT} для discovery запросов")
+            
+            # Получаем IP сервера один раз при старте
+            self.server_ip = self._get_local_ip()
+            print(f"🖥️ IP сервера: {self.server_ip}")
+            
+            while self.running:
+                try:
+                    # Ждем данные
+                    data, addr = self.sock.recvfrom(1024)
+                    message = data.decode('utf-8')
+                    
+                    # Проверяем, что это наш запрос
+                    if message == self.DISCOVERY_MESSAGE:
+                        print(f"🔍 Получен discovery запрос от {addr[0]}:{addr[1]}")
+                        
+                        # Формируем ответ
+                        response = {
+                            "type": "discovery_response",
+                            "ip": self.server_ip,
+                            "port": 8765,
+                            "name": socket.gethostname(),
+                            "version": "1.0"
+                        }
+                        
+                        response_data = json.dumps(response).encode('utf-8')
+                        
+                        # Отправляем ответ клиенту (на тот же порт, с которого пришел запрос)
+                        self.sock.sendto(response_data, addr)
+                        print(f"✅ Отправлен ответ сервера: {self.server_ip}:8765")
+                        
+                except socket.timeout:
+                    # Таймаут - просто продолжаем цикл
+                    continue
+                except Exception as e:
+                    if self.running:  # Если не остановлено специально
+                        print(f"❌ Ошибка в discovery: {e}")
+                        
+        except Exception as e:
+            print(f"❌ Критическая ошибка discovery: {e}")
+        finally:
+            if self.sock:
+                self.sock.close()
+                print("🔌 Discovery сокет закрыт")
+    
+    def _get_local_ip(self):
+        """Получает реальный IP адрес в локальной сети"""
+        try:
+            # Подключаемся к внешнему серверу, чтобы узнать наш IP
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            try:
+                # Альтернативный метод
+                return socket.gethostbyname(socket.gethostname())
+            except:
+                return "127.0.0.1"
+    
+    def stop(self):
+        """Останавливает discovery сервер"""
+        print("⏹️ Остановка Discovery сервера...")
+        self.running = False
+        if self.sock:
+            try:
+                self.sock.close()
+            except:
+                pass
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=2)
+        print("✅ Discovery сервер остановлен")
+
+
 class ScreenStreamer:
     def __init__(self):
         self.client = None
@@ -21,6 +135,7 @@ class ScreenStreamer:
         self.paused = True
         self.server = None
         self.loop = None
+        self.discovery_server = None
 
     def init_mss(self):
         if self.sct is None:
@@ -34,6 +149,11 @@ class ScreenStreamer:
                 "0.0.0.0",
                 8765
             )
+
+            if not self.discovery_server:
+                self.discovery_server = DiscoveryServer()
+                self.discovery_server.start()
+
             self.paused = False
             print("🚀 Сервер запущен на порту 8765")
         else:
@@ -42,6 +162,10 @@ class ScreenStreamer:
                 await self.server.wait_closed()
                 self.server = None
 
+            if self.discovery_server:
+                self.discovery_server.stop()
+                self.discovery_server = None
+                
             if self.client is not None:
                 await self.client.close()
             self.client = None

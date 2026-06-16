@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
     private var currentMonitor = 1
     private var monitorsInfo: List<MonitorInfo> = listOf()
 
+    private var discovery: NetworkDiscovery? = null
     data class MonitorInfo(
         val number: Int,
         val left: Int,
@@ -103,7 +104,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "ScreenViewer"
-        private val COMMON_IPS = listOf("192.168.0.120")
+        private val COMMON_IPS = listOf("")
     }
 
     //определение кнопок и т.п
@@ -288,53 +289,42 @@ class MainActivity : AppCompatActivity() {
     //подключение к серверу
     private fun startAutoDiscovery() {
         button.isEnabled = false
+        button.text = "Поиск..."
+        text.text = "🔍 Поиск сервера в сети..."
 
-        discoveryJob = CoroutineScope(Dispatchers.IO).launch {
-            var serverFound = false
+        // Отменяем предыдущий поиск
+        discovery?.stopDiscovery()
+        discovery = NetworkDiscovery()
 
-            for (ip in COMMON_IPS) {
-                if (!isActive) break
+        discovery?.discoverServers(
+            onServerFound = { ip, port, name ->
+                Log.d(TAG, "Сервер найден: $name @ $ip:$port")
 
-                try {
-                    val uri = URI("ws://$ip:8765")
-                    Log.d(TAG, "Пробуем подключиться к $uri")
-
-                    withContext(Dispatchers.Main) {
-                        text.text = "Идёт подключение к серверу..."
-                    }
-
-                    val testClient = MyWebSocketClient(uri, object : MyWebSocketClient.Listener {
-                        override fun onMessage(message: String) {}
-                        override fun onClosing(code: Int, reason: String?) {}
-                        override fun onFailure(t: Throwable) {}
-                    })
-
-                    testClient.connect()
-                    delay(1000)
-
-                    if (testClient.isOpen) {
-                        testClient.close()
-                        serverFound = true
-                        connectToWebSocket(uri)
-                        break
-                    }
-
-                } catch (e: Exception) {
-                    Log.d(TAG, "Не удалось подключиться к $ip: ${e.message}")
-                    continue
+                runOnUiThread {
+                    text.text = "✅ Найден сервер: $name\nПодключение..."
+                    connectToWebSocket(URI("ws://$ip:$port"))
+                    menuButton.isEnabled = true
+                    menuButton.visibility = View.VISIBLE
                 }
-            }
+            },
+            onError = { error ->
+                Log.e(TAG, "Ошибка поиска: $error")
 
-            withContext(Dispatchers.Main) {
-                if (!serverFound) {
-                    text.text = "❌ Сервер не найден\n\nУбедитесь, что:\n1. Программа запущена на компьютере\n2. Оба устройства в одной сети WiFi"
+                runOnUiThread {
+                    text.text = "❌ $error\n\n" +
+                            "Проверьте:\n" +
+                            "1. Сервер запущен на ПК\n" +
+                            "2. Устройства в одной сети\n" +
+                            "3. Фаервол не блокирует порты 8765 и 8766"
                     button.isEnabled = true
-                    button.text = "Попробовать снова"
+                    button.text = "Найти снова"
                     menuButton.isEnabled = false
                     menuButton.visibility = View.GONE
                 }
-            }
-        }
+            },
+            timeoutSeconds = 5,
+            attempts = 3
+        )
     }
 
     private fun connectToWebSocket(uri: URI) {
@@ -745,8 +735,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        discovery?.stopDiscovery()
+
         disconnectFromWebSocket()
         websocketJob?.cancel()
         discoveryJob?.cancel()
+        frameTimeoutJob?.cancel()
     }
 }
