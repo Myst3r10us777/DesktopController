@@ -561,17 +561,21 @@ class MainActivity : AppCompatActivity() {
                     Log.d(TAG, "Касание на изображении: X=$x, Y=$y")
 
                     val currentTime = System.currentTimeMillis()
+                    val absoluteCoords = convertToAbsoluteCoords(x, y)
+
 
                     if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
                         dClick = true
                         cancelLongPress()
-
-                        val absoluteCoords = convertToAbsoluteCoords(x, y)
                         absoluteCoords?.let { (absX, absY) ->
                             websocketClient?.sendClick(absX, absY, 0, "down", "click")
                             Log.d(TAG, "Двойное нажатие - левый клик: X=$absX, Y=$absY down")
                         }
                     } else {
+                        absoluteCoords?.let { (absX, absY) ->
+                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
+                            Log.d(TAG, "Одиночное нажатие - левый клик: X=$absX, Y=$absY down")
+                        }
                         startLongPressTimer(x, y)
                     }
 
@@ -585,7 +589,7 @@ class MainActivity : AppCompatActivity() {
                         val dx = event.x - lastTouchX
                         val dy = event.y - lastTouchY
 
-                        if (dx > 5 || dx < -5 || dy > 5 || dy < -5) {
+                        if (dx > 20 || dx < -20 || dy > 20 || dy < -20) {
                             cancelLongPress()
                         }
 
@@ -624,17 +628,17 @@ class MainActivity : AppCompatActivity() {
                 cancelLongPress()
                 isDragging = false
 
-                if (!isLongPressTriggered && dClick) {
-                    val imageCoords = getImageCoordinates(event.x, event.y)
-                    imageCoords?.let { (x, y) ->
-                        Log.d(TAG, "Отпускание на изображении: X=$x, Y=$y")
-                        val absoluteCoords = convertToAbsoluteCoords(x, y)
-                        absoluteCoords?.let { (absX, absY) ->
-                            websocketClient?.sendClick(absX, absY, 0, "up", "click")
-                        }
+                val imageCoords = getImageCoordinates(event.x, event.y)
+                imageCoords?.let { (x, y) ->
+                    val absoluteCoords = convertToAbsoluteCoords(x, y)
+                    absoluteCoords?.let { (absX, absY) ->
+                        websocketClient?.sendClick(absX, absY, 0, "up", "click")
+                        Log.d(TAG, "Клик UP: X=$absX, Y=$absY, dClick=$dClick")
                     }
                 }
+
                 isLongPressTriggered = false
+                dClick = false
             }
         }
 
