@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/menu_desktop_1"
+            android:title="Рабочий стол 1" />
+        <item
+            android:id="@+id/menu_desktop_2"
+            android:title="Рабочий стол 2" />
+        <item
+            android:id="@+id/menu_desktop_3"
+            android:title="Рабочий стол 3" />
+    </group>
+
+<!--    <group android:checkableBehavior="none">-->
+<!--        <item-->
+<!--            android:id="@+id/Keyboard"-->
+<!--            android:title="Клавиатура" />-->
+<!--    </group>-->
+
+    <group android:checkableBehavior="none">
+        <item
+            android:id="@+id/menu_disconnect"
+            android:title="Отключиться" />
+    </group>
+</menu>
