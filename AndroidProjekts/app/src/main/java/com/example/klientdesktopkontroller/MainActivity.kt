@@ -8,13 +8,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.Trace.isEnabled
-import android.text.Editable
-import android.text.TextWatcher
 import android.util.Base64
 import android.util.Log
 import android.view.GestureDetector
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -28,11 +24,8 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
-import androidx.core.view.isVisible
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.CoroutineScope
@@ -42,10 +35,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
-import kotlin.math.abs
 import com.example.klientdesktopkontroller.WebSocketClient as MyWebSocketClient
 
 class MainActivity : AppCompatActivity() {
@@ -69,33 +60,19 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var gestureDetector: GestureDetector
     private var scaleFactor = 1.0f
-    private var lastTouchX = 0f
-    private var lastTouchY = 0f
     private var posX = 0f
     private var posY = 0f
-    private var isDragging = false
-
     private lateinit var keyboardInputField: EditText
 
     private var longPressRunnable: Runnable? = null
     private val handler = Handler(Looper.getMainLooper())
     private val LONG_PRESS_DELAY = 1000L
     private var isLongPressTriggered = false
-
-    private var lastTapTime = 0L
-    private val DOUBLE_TAP_DELAY = 300L
-
-    private var dClick = false
     private var lastFrameTime = 0L
     private val frameTimeout = 3000L
     private val frameTimeoutCheckInterval = 500L
     private var frameTimeoutJob: Job? = null
-
     private val matrix = Matrix()
-
-    private var scrollThreshold = 20f
-    private var lastScrollY = 0f
-
     private var currentMonitor = 1
     private var monitorsInfo: List<MonitorInfo> = listOf()
 
@@ -110,7 +87,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "ScreenViewer"
-        //private val COMMON_IPS = listOf("")
     }
 
     fun View.enable() {
@@ -155,8 +131,8 @@ class MainActivity : AppCompatActivity() {
             startAutoDiscovery()
         }
         setupZoomGestures()
+        setupGestureDetector()
         setupTouchListener()
-        //setupGestureDetector()
         startFrameTimeoutChecker()
     }
 
@@ -235,7 +211,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupTouchListener() {
         imageView.setOnTouchListener { _, event ->
-            onTouchEvent(event)
+            gestureDetector.onTouchEvent(event)
+            scaleGestureDetector.onTouchEvent(event)
+
             true
         }
     }
@@ -266,54 +244,89 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-//    private fun setupGestureDetector(){
-//        gestureDetector = GestureDetector(context,
-//            object : GestureDetector.SimpleOnGestureListener() {
-//
-//                override fun onSingleTapUp(e: MotionEvent): Boolean {
-//                    handleSingleTap(e)
-//                    return true
-//                }
-//
-//                override fun onDoubleTap(e: MotionEvent): Boolean {
-//                    handleDoubleTap(e)
-//                    return true
-//                }
-//
-//                override fun onLongPress(e: MotionEvent) {
-//                    handleLongPress(e)
-//                }
-//            }
-//        )
-//    }
-//
-//
-//    private fun handleSingleTap(e: MotionEvent){
-//        val imageCoords = getImageCoordinates(e.x, e.y)
-//        imageCoords?.let { (x, y) ->
-//            Log.d(TAG, "Касание на изображении: X=$x, Y=$y")
-//
-//            val currentTime = System.currentTimeMillis()
-//            val absoluteCoords = convertToAbsoluteCoords(x, y)
-//
-//            if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
-//                dClick = true
-//                cancelLongPress()
-//                absoluteCoords?.let { (absX, absY) ->
-//                    websocketClient?.sendClick(absX, absY, 0, "down", "click")
-//                    Log.d(TAG, "Двойное нажатие - левый клик: X=$absX, Y=$absY down")
-//                }
-//            } else {
-//                absoluteCoords?.let { (absX, absY) ->
-//                    websocketClient?.sendClick(absX, absY, 0, "down", "click")
-//                    Log.d(TAG, "Одиночное нажатие - левый клик: X=$absX, Y=$absY down")
-//                }
-//                startLongPressTimer(x, y)
-//            }
-//
-//            lastTapTime = currentTime
-//        }
-//    }
+    private fun handleSingleTap(e: MotionEvent) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 0, "down", "click")
+                Log.d(TAG, "Клик: ($absX, $absY)")
+            }
+        }
+    }
+    private fun setupGestureDetector(){
+        gestureDetector = GestureDetector(this,
+            object : GestureDetector.SimpleOnGestureListener() {
+
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    handleSingleTap(e)
+                    return true
+                }
+
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    handleDoubleTap(e)
+                    return true
+                }
+
+                override fun onLongPress(e: MotionEvent) {
+                    handleLongPress(e)
+                }
+
+                override fun onScroll(
+                    e1: MotionEvent?,
+                    e2: MotionEvent,
+                    distanceX: Float,
+                    distanceY: Float
+                ): Boolean {
+                    handleScroll(e2, distanceX, distanceY)
+                    return true
+                }
+            }
+        )
+    }
+
+    private fun handleDoubleTap(e: MotionEvent) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 0, "down", "click")
+                websocketClient?.sendClick(absX, absY, 0, "up", "click")
+                Log.d(TAG, "Двойной клик: ($absX, $absY)")
+            }
+        }
+    }
+
+    private fun handleLongPress(e: MotionEvent) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 1, "click", "click")
+                Log.d(TAG, "Правый клик (долгое нажатие): ($absX, $absY)")
+            }
+        }
+    }
+
+    private fun handleScroll(e: MotionEvent, distanceX: Float, distanceY: Float) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+        val scrollAmount = if (distanceY > 0) "up" else "down"
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 0, scrollAmount, "wheel")
+                Log.d(TAG, "Скролл: $scrollAmount на ($absX, $absY)")
+            }
+        }
+    }
 
     //подогнать масштаб под телефон
     private fun applyImageTransform() {
@@ -600,123 +613,123 @@ class MainActivity : AppCompatActivity() {
         val absoluteX = currentMonitorInfo.left + (normalizedX * currentMonitorInfo.width).toInt()
         val absoluteY = currentMonitorInfo.top + (normalizedY * currentMonitorInfo.height).toInt()
 
-        Log.d(TAG, "📐 Преобразование координат: нормализованные ($normalizedX, $normalizedY) -> абсолютные ($absoluteX, $absoluteY)")
-        Log.d(TAG, "📐 Монитор $currentMonitor: left=${currentMonitorInfo.left}, top=${currentMonitorInfo.top}, width=${currentMonitorInfo.width}, height=${currentMonitorInfo.height}")
+        Log.d(TAG, "Преобразование координат: нормализованные ($normalizedX, $normalizedY) -> абсолютные ($absoluteX, $absoluteY)")
+        Log.d(TAG, "Монитор $currentMonitor: left=${currentMonitorInfo.left}, top=${currentMonitorInfo.top}, width=${currentMonitorInfo.width}, height=${currentMonitorInfo.height}")
 
         return Pair(absoluteX, absoluteY)
     }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleGestureDetector.onTouchEvent(event)
-
-        if (scaleGestureDetector.isInProgress) {
-            when (event.actionMasked) {
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    isDragging = false
-                }
-            }
-            return true
-        }
-
-        if (event.pointerCount > 2) {
-            return true
-        }
-
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                lastTouchX = event.x
-                lastTouchY = event.y
-                lastScrollY = event.y
-                isDragging = true
-                dClick = false
-
-                val imageCoords = getImageCoordinates(event.x, event.y)
-                imageCoords?.let { (x, y) ->
-                    Log.d(TAG, "Касание на изображении: X=$x, Y=$y")
-
-                    val currentTime = System.currentTimeMillis()
-                    val absoluteCoords = convertToAbsoluteCoords(x, y)
-
-                    if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
-                        dClick = true
-                        cancelLongPress()
-                        absoluteCoords?.let { (absX, absY) ->
-                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
-                            Log.d(TAG, "Двойное нажатие - левый клик: X=$absX, Y=$absY down")
-                        }
-                    } else {
-                        absoluteCoords?.let { (absX, absY) ->
-                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
-                            Log.d(TAG, "Одиночное нажатие - левый клик: X=$absX, Y=$absY down")
-                        }
-                        startLongPressTimer(x, y)
-                    }
-
-                    lastTapTime = currentTime
-                }
-            }
-
-            MotionEvent.ACTION_MOVE -> {
-                try{
-                    if (isDragging && !dClick) {
-                        val dx = event.x - lastTouchX
-                        val dy = event.y - lastTouchY
-
-                        if (dx > 20 || dx < -20 || dy > 20 || dy < -20) {
-                            cancelLongPress()
-                        }
-
-                        if (!dClick && (scaleFactor == 1f)) {
-                            val scrollDelta = event.y - lastScrollY
-
-                            if (abs(scrollDelta) > scrollThreshold) {
-                                val scrollDirection = if (scrollDelta > 0) "down" else "up"
-
-                                val imageCoords = getImageCoordinates(event.x, event.y)
-                                imageCoords?.let { (x, y) ->
-                                    val absoluteCoords = convertToAbsoluteCoords(x, y)
-                                    absoluteCoords?.let { (absX, absY) ->
-                                        websocketClient?.sendClick(absX, absY, 0, scrollDirection, "wheel")
-                                        Log.d(TAG, "Скролл: $scrollDirection at $absX,$absY")
-                                    }
-                                }
-
-                                lastScrollY = event.y
-                            }
-                        }
-
-                        posX += dx
-                        posY += dy
-                        applyImageTransform()
-
-                        lastTouchX = event.x
-                        lastTouchY = event.y
-                    }
-                } catch (e: Exception){
-                    Log.e(TAG, "Ошибка при скролле", e)
-                }
-            }
-
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                cancelLongPress()
-                isDragging = false
-
-                val imageCoords = getImageCoordinates(event.x, event.y)
-                imageCoords?.let { (x, y) ->
-                    val absoluteCoords = convertToAbsoluteCoords(x, y)
-                    absoluteCoords?.let { (absX, absY) ->
-                        websocketClient?.sendClick(absX, absY, 0, "up", "click")
-                        Log.d(TAG, "Клик UP: X=$absX, Y=$absY, dClick=$dClick")
-                    }
-                }
-
-                isLongPressTriggered = false
-                dClick = false
-            }
-        }
-
-        return true
-    }
+//    override fun onTouchEvent(event: MotionEvent): Boolean {
+//        scaleGestureDetector.onTouchEvent(event)
+//
+//        if (scaleGestureDetector.isInProgress) {
+//            when (event.actionMasked) {
+//                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+//                    isDragging = false
+//                }
+//            }
+//            return true
+//        }
+//
+//        if (event.pointerCount > 2) {
+//            return true
+//        }
+//
+//        when (event.actionMasked) {
+//            MotionEvent.ACTION_DOWN -> {
+//                lastTouchX = event.x
+//                lastTouchY = event.y
+//                lastScrollY = event.y
+//                isDragging = true
+//                dClick = false
+//
+//                val imageCoords = getImageCoordinates(event.x, event.y)
+//                imageCoords?.let { (x, y) ->
+//                    Log.d(TAG, "Касание на изображении: X=$x, Y=$y")
+//
+//                    val currentTime = System.currentTimeMillis()
+//                    val absoluteCoords = convertToAbsoluteCoords(x, y)
+//
+//                    if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
+//                        dClick = true
+//                        cancelLongPress()
+//                        absoluteCoords?.let { (absX, absY) ->
+//                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
+//                            Log.d(TAG, "Двойное нажатие - левый клик: X=$absX, Y=$absY down")
+//                        }
+//                    } else {
+//                        absoluteCoords?.let { (absX, absY) ->
+//                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
+//                            Log.d(TAG, "Одиночное нажатие - левый клик: X=$absX, Y=$absY down")
+//                        }
+//                        startLongPressTimer(x, y)
+//                    }
+//
+//                    lastTapTime = currentTime
+//                }
+//            }
+//
+//            MotionEvent.ACTION_MOVE -> {
+//                try{
+//                    if (isDragging && !dClick) {
+//                        val dx = event.x - lastTouchX
+//                        val dy = event.y - lastTouchY
+//
+//                        if (dx > 20 || dx < -20 || dy > 20 || dy < -20) {
+//                            cancelLongPress()
+//                        }
+//
+//                        if (!dClick && (scaleFactor == 1f)) {
+//                            val scrollDelta = event.y - lastScrollY
+//
+//                            if (abs(scrollDelta) > scrollThreshold) {
+//                                val scrollDirection = if (scrollDelta > 0) "down" else "up"
+//
+//                                val imageCoords = getImageCoordinates(event.x, event.y)
+//                                imageCoords?.let { (x, y) ->
+//                                    val absoluteCoords = convertToAbsoluteCoords(x, y)
+//                                    absoluteCoords?.let { (absX, absY) ->
+//                                        websocketClient?.sendClick(absX, absY, 0, scrollDirection, "wheel")
+//                                        Log.d(TAG, "Скролл: $scrollDirection at $absX,$absY")
+//                                    }
+//                                }
+//
+//                                lastScrollY = event.y
+//                            }
+//                        }
+//
+//                        posX += dx
+//                        posY += dy
+//                        applyImageTransform()
+//
+//                        lastTouchX = event.x
+//                        lastTouchY = event.y
+//                    }
+//                } catch (e: Exception){
+//                    Log.e(TAG, "Ошибка при скролле", e)
+//                }
+//            }
+//
+//            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+//                cancelLongPress()
+//                isDragging = false
+//
+//                val imageCoords = getImageCoordinates(event.x, event.y)
+//                imageCoords?.let { (x, y) ->
+//                    val absoluteCoords = convertToAbsoluteCoords(x, y)
+//                    absoluteCoords?.let { (absX, absY) ->
+//                        websocketClient?.sendClick(absX, absY, 0, "up", "click")
+//                        Log.d(TAG, "Клик UP: X=$absX, Y=$absY, dClick=$dClick")
+//                    }
+//                }
+//
+//                isLongPressTriggered = false
+//                dClick = false
+//            }
+//        }
+//
+//        return true
+//    }
     private fun startLongPressTimer(normalizedX: Float, normalizedY: Float) {
         cancelLongPress()
 
