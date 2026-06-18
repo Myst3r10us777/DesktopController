@@ -501,6 +501,9 @@ class MainActivity : AppCompatActivity() {
                     "frame" -> {
                         lastFrameTime = System.currentTimeMillis()
                         runOnUiThread {
+                            text.text = ""
+                            text.visibility = View.GONE
+                            button.disable()
                             menuButton.enable()
                             keyboardButton.enable()
                         }
