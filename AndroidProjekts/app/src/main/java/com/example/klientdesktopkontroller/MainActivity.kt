@@ -13,6 +13,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.util.Base64
 import android.util.Log
+import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -31,6 +32,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.core.view.isVisible
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +53,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var button: Button
 
     private lateinit var menuButton: Button
+
+    private lateinit var keyboardButton: Button
     private lateinit var text: TextView
     private lateinit var imageView: ImageView
 
@@ -62,6 +66,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navigationView: NavigationView
 
     private lateinit var scaleGestureDetector: ScaleGestureDetector
+
+    private lateinit var gestureDetector: GestureDetector
     private var scaleFactor = 1.0f
     private var lastTouchX = 0f
     private var lastTouchY = 0f
@@ -104,7 +110,17 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "ScreenViewer"
-        private val COMMON_IPS = listOf("")
+        //private val COMMON_IPS = listOf("")
+    }
+
+    fun View.enable() {
+        isEnabled = true
+        visibility = View.VISIBLE
+    }
+
+    fun View.disable() {
+        isEnabled = false
+        visibility = View.GONE
     }
 
     //определение кнопок и т.п
@@ -119,7 +135,9 @@ class MainActivity : AppCompatActivity() {
         navigationView = findViewById(R.id.navigationView)
         keyboardInputField = findViewById(R.id.TextKeyBoard)
         menuButton = findViewById<Button>(R.id.menuButton)
-        menuButton.isEnabled = false
+        keyboardButton = findViewById<Button>(R.id.Keyboard)
+        menuButton.disable()
+        keyboardButton.disable()
         menuButton.setOnClickListener {
             if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
                 drawerLayout.closeDrawer(GravityCompat.START)
@@ -128,12 +146,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        keyboardButton.setOnClickListener {
+            Keyboard()
+        }
+
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
         button.setOnClickListener {
             startAutoDiscovery()
         }
         setupZoomGestures()
         setupTouchListener()
+        //setupGestureDetector()
         startFrameTimeoutChecker()
     }
 
@@ -157,6 +180,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun Keyboard() {
         runOnUiThread {
+            if (keyboardInputField.visibility == View.VISIBLE){
+                keyboardInputField.visibility = View.GONE
+                return@runOnUiThread
+            }
             keyboardInputField.visibility = View.VISIBLE
             keyboardInputField.setText("")
             keyboardInputField.requestFocus()
@@ -239,6 +266,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+//    private fun setupGestureDetector(){
+//        gestureDetector = GestureDetector(context,
+//            object : GestureDetector.SimpleOnGestureListener() {
+//
+//                override fun onSingleTapUp(e: MotionEvent): Boolean {
+//                    handleSingleTap(e)
+//                    return true
+//                }
+//
+//                override fun onDoubleTap(e: MotionEvent): Boolean {
+//                    handleDoubleTap(e)
+//                    return true
+//                }
+//
+//                override fun onLongPress(e: MotionEvent) {
+//                    handleLongPress(e)
+//                }
+//            }
+//        )
+//    }
+//
+//
+//    private fun handleSingleTap(e: MotionEvent){
+//        val imageCoords = getImageCoordinates(e.x, e.y)
+//        imageCoords?.let { (x, y) ->
+//            Log.d(TAG, "Касание на изображении: X=$x, Y=$y")
+//
+//            val currentTime = System.currentTimeMillis()
+//            val absoluteCoords = convertToAbsoluteCoords(x, y)
+//
+//            if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
+//                dClick = true
+//                cancelLongPress()
+//                absoluteCoords?.let { (absX, absY) ->
+//                    websocketClient?.sendClick(absX, absY, 0, "down", "click")
+//                    Log.d(TAG, "Двойное нажатие - левый клик: X=$absX, Y=$absY down")
+//                }
+//            } else {
+//                absoluteCoords?.let { (absX, absY) ->
+//                    websocketClient?.sendClick(absX, absY, 0, "down", "click")
+//                    Log.d(TAG, "Одиночное нажатие - левый клик: X=$absX, Y=$absY down")
+//                }
+//                startLongPressTimer(x, y)
+//            }
+//
+//            lastTapTime = currentTime
+//        }
+//    }
+
     //подогнать масштаб под телефон
     private fun applyImageTransform() {
         val drawable = imageView.drawable ?: return
@@ -273,7 +349,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Для Android 11 и выше
             window.setDecorFitsSystemWindows(false)
             val controller = window.insetsController
             controller?.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
@@ -290,9 +365,8 @@ class MainActivity : AppCompatActivity() {
     private fun startAutoDiscovery() {
         button.isEnabled = false
         button.text = "Поиск..."
-        text.text = "🔍 Поиск сервера в сети..."
+        text.text = "Поиск сервера в сети..."
 
-        // Отменяем предыдущий поиск
         discovery?.stopDiscovery()
         discovery = NetworkDiscovery()
 
@@ -301,10 +375,10 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG, "Сервер найден: $name @ $ip:$port")
 
                 runOnUiThread {
-                    text.text = "✅ Найден сервер: $name\nПодключение..."
+                    text.text = "Найден сервер: $name\nПодключение..."
                     connectToWebSocket(URI("ws://$ip:$port"))
-                    menuButton.isEnabled = true
-                    menuButton.visibility = View.VISIBLE
+                    menuButton.enable()
+                    keyboardButton.enable()
                 }
             },
             onError = { error ->
@@ -318,8 +392,8 @@ class MainActivity : AppCompatActivity() {
                             "3. Фаервол не блокирует порты 8765 и 8766"
                     button.isEnabled = true
                     button.text = "Найти снова"
-                    menuButton.isEnabled = false
-                    menuButton.visibility = View.GONE
+                    menuButton.disable()
+                    keyboardButton.disable()
                 }
             },
             timeoutSeconds = 5,
@@ -370,8 +444,8 @@ class MainActivity : AppCompatActivity() {
                             text.text = "❌ Ошибка подключения\n"
                             button.text = "Подключиться"
                             button.isEnabled = true
-                            menuButton.isEnabled = false
-                            menuButton.visibility = View.GONE
+                            menuButton.disable()
+                            keyboardButton.disable()
                         }
                     }
 
@@ -381,8 +455,8 @@ class MainActivity : AppCompatActivity() {
                             text.text = "❌ Ошибка подключения\n${t.message}"
                             button.text = "Подключиться"
                             button.isEnabled = true
-                            menuButton.isEnabled = false
-                            menuButton.visibility = View.GONE
+                            menuButton.disable()
+                            keyboardButton.disable()
                         }
                     }
                 })
@@ -397,8 +471,8 @@ class MainActivity : AppCompatActivity() {
                     text.text = "❌ Ошибка: ${e.message}"
                     button.text = "Подключиться"
                     button.isEnabled = true
-                    menuButton.isEnabled = false
-                    menuButton.visibility = View.GONE
+                    menuButton.disable()
+                    keyboardButton.disable()
                 }
             }
         }
@@ -414,8 +488,8 @@ class MainActivity : AppCompatActivity() {
                     "frame" -> {
                         lastFrameTime = System.currentTimeMillis()
                         runOnUiThread {
-                            menuButton.isEnabled = true
-                            menuButton.visibility = View.VISIBLE
+                            menuButton.enable()
+                            keyboardButton.enable()
                         }
                         val frameData = jsonObject.getString("data")
                         val bitmap = decodeBase64ToBitmap(frameData)
@@ -474,8 +548,8 @@ class MainActivity : AppCompatActivity() {
 
             text.text = "Связь с сервером потеряна. Пытаемся повторно подключиться"
             button.isEnabled = false
-            menuButton.isEnabled = false
-            menuButton.visibility = View.GONE
+            menuButton.disable()
+            keyboardButton.disable()
 
             scaleFactor = 1.0f
             posX = 0f
@@ -562,7 +636,6 @@ class MainActivity : AppCompatActivity() {
 
                     val currentTime = System.currentTimeMillis()
                     val absoluteCoords = convertToAbsoluteCoords(x, y)
-
 
                     if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
                         dClick = true
@@ -723,11 +796,11 @@ class MainActivity : AppCompatActivity() {
                 lastFrameTime = 0L
                 delay(50)
                 runOnUiThread {
-                    menuButton.visibility = View.GONE
+                    menuButton.disable()
+                    keyboardButton.disable()
                     text.text = "Вы оключились"
                     imageView.visibility = ImageView.GONE
                     button.isEnabled = true
-                    menuButton.isEnabled = false
                     button.text = "Подключиться"
                 }
                 Toast.makeText(this@MainActivity, "ПОДТВЕРЖДЕНИЕ", Toast.LENGTH_LONG).show()
