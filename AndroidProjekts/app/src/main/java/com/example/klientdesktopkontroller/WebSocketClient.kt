@@ -1,12 +1,11 @@
 package com.example.klientdesktopkontroller
 
 import android.util.Log
-import android.widget.Toast
-import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import java.lang.Exception
 import java.net.URI
 import org.json.JSONObject
+import java.nio.ByteBuffer
 
 class WebSocketClient(
     serverUri: URI,
@@ -14,7 +13,8 @@ class WebSocketClient(
 ) : org.java_websocket.client.WebSocketClient(serverUri) {
 
     interface Listener {
-        fun onMessage(message: String)
+        fun  onMessage(message: String)
+        //fun onBinaryMessage(data: ByteArray)
         fun onClosing(code: Int, reason: String?)
         fun onFailure(t: Throwable)
     }
@@ -70,6 +70,14 @@ class WebSocketClient(
     override fun onMessage(message: String?) {
         message?.let { listener.onMessage(it) }
     }
+
+//    override fun onMessage(message: ByteBuffer?) {
+//        message?.let { buffer ->
+//            val bytes = ByteArray(buffer.remaining())
+//            buffer.get(bytes)
+//            listener.onBinaryMessage(bytes)
+//        }
+//    }
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         listener.onClosing(code, reason)
