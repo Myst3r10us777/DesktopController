@@ -24,6 +24,7 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -38,6 +39,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URI
 import com.example.klientdesktopkontroller.WebSocketClient as MyWebSocketClient
+import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : AppCompatActivity() {
 
@@ -63,11 +65,6 @@ class MainActivity : AppCompatActivity() {
     private var posX = 0f
     private var posY = 0f
     private lateinit var keyboardInputField: EditText
-
-    private var longPressRunnable: Runnable? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private val LONG_PRESS_DELAY = 1000L
-    private var isLongPressTriggered = false
     private var lastFrameTime = 0L
     private val frameTimeout = 3000L
     private val frameTimeoutCheckInterval = 500L
@@ -141,7 +138,7 @@ class MainActivity : AppCompatActivity() {
         frameTimeoutJob?.cancel()
         frameTimeoutJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
-                delay(frameTimeoutCheckInterval)
+                delay(frameTimeoutCheckInterval.milliseconds)
 
                 val currentTime = System.currentTimeMillis()
                 val timeSinceLastFrame = currentTime - lastFrameTime
@@ -213,7 +210,6 @@ class MainActivity : AppCompatActivity() {
         imageView.setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
             scaleGestureDetector.onTouchEvent(event)
-
             true
         }
     }
@@ -239,9 +235,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            scaleGestureDetector.isQuickScaleEnabled = false
-        }
+        scaleGestureDetector.isQuickScaleEnabled = false
     }
 
     private fun handleSingleTap(e: MotionEvent) {
@@ -280,7 +274,14 @@ class MainActivity : AppCompatActivity() {
                     distanceX: Float,
                     distanceY: Float
                 ): Boolean {
-                    handleScroll(e2, distanceX, distanceY)
+                    if (scaleFactor > 1.0f) {
+                        posX -= distanceX
+                        posY -= distanceY
+                        applyImageTransform()
+                        return true
+                    }
+
+                    handleScroll(e2, distanceY)
                     return true
                 }
             }
@@ -314,7 +315,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleScroll(e: MotionEvent, distanceX: Float, distanceY: Float) {
+    private fun handleScroll(e: MotionEvent, distanceY: Float) {
         val imageCoords = getImageCoordinates(e.x, e.y)
         val scrollAmount = if (distanceY > 0) "up" else "down"
 
@@ -362,7 +363,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
+            enableEdgeToEdge()
             val controller = window.insetsController
             controller?.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
             controller?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -414,6 +415,68 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun handleWebSocketMessage(message: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val jsonObject = JSONObject(message)
+                val type = jsonObject.getString("type")
+
+                when (type) {
+                    "frame" -> {
+                        lastFrameTime = System.currentTimeMillis()
+                        runOnUiThread {
+                            text.text = ""
+                            text.visibility = View.GONE
+                            button.disable()
+                            menuButton.enable()
+                            keyboardButton.enable()
+                        }
+                        val frameData = jsonObject.getString("data")
+                        val bitmap = decodeBase64ToBitmap(frameData)
+
+                        bitmap?.let {
+                            withContext(Dispatchers.Main) {
+                                imageView.setImageBitmap(it)
+                                imageView.visibility = ImageView.VISIBLE
+                                applyImageTransform()
+                            }
+                        }
+                    }
+
+                    "monitors_info" -> {
+                        val monitorsCount = jsonObject.getInt("monitors_count")
+                        val monitorsArray = jsonObject.getJSONArray("monitors")
+
+                        val monitorsList = mutableListOf<MonitorInfo>()
+                        for (i in 0 until monitorsArray.length()) {
+                            val monitorJson = monitorsArray.getJSONObject(i)
+                            monitorsList.add(MonitorInfo(
+                                number = monitorJson.getInt("number"),
+                                left = monitorJson.getInt("left"),
+                                top = monitorJson.getInt("top"),
+                                width = monitorJson.getInt("width"),
+                                height = monitorJson.getInt("height")
+                            ))
+                        }
+
+                        monitorsInfo = monitorsList
+
+                        withContext(Dispatchers.Main) {
+                            updateMonitorsMenu(monitorsCount)
+                        }
+
+                        Log.d(TAG, "Получена информация о ${monitorsInfo.size} мониторах")
+                        monitorsInfo.forEach { monitor ->
+                            Log.d(TAG, "Монитор ${monitor.number}: ${monitor.width}x${monitor.height} at (${monitor.left}, ${monitor.top})")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка обработки сообщения", e)
+            }
+        }
+    }
+
     private fun connectToWebSocket(uri: URI) {
         lastFrameTime = System.currentTimeMillis()
         startFrameTimeoutChecker()
@@ -452,6 +515,26 @@ class MainActivity : AppCompatActivity() {
                         handleWebSocketMessage(message)
                     }
 
+//                    override fun onBinaryMessage(data: ByteArray) {
+//                        lastFrameTime = System.currentTimeMillis()
+//                        runOnUiThread {
+//                            text.text = ""
+//                            text.visibility = View.GONE
+//                            button.disable()
+//                            menuButton.enable()
+//                            keyboardButton.enable()
+//                        }
+//                        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+//
+//                        bitmap?.let {
+//                            runOnUiThread {
+//                                imageView.setImageBitmap(it)
+//                                imageView.visibility = ImageView.VISIBLE
+//                                applyImageTransform()
+//                            }
+//                        }
+//                    }
+
                     override fun onClosing(code: Int, reason: String?) {
                         runOnUiThread {
                             text.text = "❌ Ошибка подключения\n"
@@ -487,67 +570,6 @@ class MainActivity : AppCompatActivity() {
                     menuButton.disable()
                     keyboardButton.disable()
                 }
-            }
-        }
-    }
-
-    private fun handleWebSocketMessage(message: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val jsonObject = JSONObject(message)
-                val type = jsonObject.getString("type")
-
-                when (type) {
-                    "frame" -> {
-                        lastFrameTime = System.currentTimeMillis()
-                        runOnUiThread {
-                            text.text = ""
-                            text.visibility = View.GONE
-                            button.disable()
-                            menuButton.enable()
-                            keyboardButton.enable()
-                        }
-                        val frameData = jsonObject.getString("data")
-                        val bitmap = decodeBase64ToBitmap(frameData)
-
-                        bitmap?.let {
-                            withContext(Dispatchers.Main) {
-                                imageView.setImageBitmap(it)
-                                imageView.visibility = ImageView.VISIBLE
-                                applyImageTransform()
-                            }
-                        }
-                    }
-                    "monitors_info" -> {
-                        val monitorsCount = jsonObject.getInt("monitors_count")
-                        val monitorsArray = jsonObject.getJSONArray("monitors")
-
-                        val monitorsList = mutableListOf<MonitorInfo>()
-                        for (i in 0 until monitorsArray.length()) {
-                            val monitorJson = monitorsArray.getJSONObject(i)
-                            monitorsList.add(MonitorInfo(
-                                number = monitorJson.getInt("number"),
-                                left = monitorJson.getInt("left"),
-                                top = monitorJson.getInt("top"),
-                                width = monitorJson.getInt("width"),
-                                height = monitorJson.getInt("height")
-                            ))
-                        }
-
-                        monitorsInfo = monitorsList
-
-                        withContext(Dispatchers.Main) {
-                            updateMonitorsMenu(monitorsCount)
-                        }
-
-                        Log.d(TAG, "Получена информация о ${monitorsInfo.size} мониторах")
-                        monitorsInfo.forEach { monitor ->
-                            Log.d(TAG, "Монитор ${monitor.number}: ${monitor.width}x${monitor.height} at (${monitor.left}, ${monitor.top})")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Ошибка обработки сообщения", e)
             }
         }
     }
@@ -609,7 +631,7 @@ class MainActivity : AppCompatActivity() {
         val currentMonitorInfo = monitorsInfo.find { it.number == currentMonitor }
 
         if (currentMonitorInfo == null) {
-            Log.e(TAG, "❌ convertToAbsoluteCoords: монитор $currentMonitor не найден в monitorsInfo: ${monitorsInfo.map { it.number }}")
+            Log.e(TAG, "convertToAbsoluteCoords: монитор $currentMonitor не найден в monitorsInfo: ${monitorsInfo.map { it.number }}")
             return null
         }
 
@@ -622,141 +644,6 @@ class MainActivity : AppCompatActivity() {
         return Pair(absoluteX, absoluteY)
     }
 
-//    override fun onTouchEvent(event: MotionEvent): Boolean {
-//        scaleGestureDetector.onTouchEvent(event)
-//
-//        if (scaleGestureDetector.isInProgress) {
-//            when (event.actionMasked) {
-//                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-//                    isDragging = false
-//                }
-//            }
-//            return true
-//        }
-//
-//        if (event.pointerCount > 2) {
-//            return true
-//        }
-//
-//        when (event.actionMasked) {
-//            MotionEvent.ACTION_DOWN -> {
-//                lastTouchX = event.x
-//                lastTouchY = event.y
-//                lastScrollY = event.y
-//                isDragging = true
-//                dClick = false
-//
-//                val imageCoords = getImageCoordinates(event.x, event.y)
-//                imageCoords?.let { (x, y) ->
-//                    Log.d(TAG, "Касание на изображении: X=$x, Y=$y")
-//
-//                    val currentTime = System.currentTimeMillis()
-//                    val absoluteCoords = convertToAbsoluteCoords(x, y)
-//
-//                    if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
-//                        dClick = true
-//                        cancelLongPress()
-//                        absoluteCoords?.let { (absX, absY) ->
-//                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
-//                            Log.d(TAG, "Двойное нажатие - левый клик: X=$absX, Y=$absY down")
-//                        }
-//                    } else {
-//                        absoluteCoords?.let { (absX, absY) ->
-//                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
-//                            Log.d(TAG, "Одиночное нажатие - левый клик: X=$absX, Y=$absY down")
-//                        }
-//                        startLongPressTimer(x, y)
-//                    }
-//
-//                    lastTapTime = currentTime
-//                }
-//            }
-//
-//            MotionEvent.ACTION_MOVE -> {
-//                try{
-//                    if (isDragging && !dClick) {
-//                        val dx = event.x - lastTouchX
-//                        val dy = event.y - lastTouchY
-//
-//                        if (dx > 20 || dx < -20 || dy > 20 || dy < -20) {
-//                            cancelLongPress()
-//                        }
-//
-//                        if (!dClick && (scaleFactor == 1f)) {
-//                            val scrollDelta = event.y - lastScrollY
-//
-//                            if (abs(scrollDelta) > scrollThreshold) {
-//                                val scrollDirection = if (scrollDelta > 0) "down" else "up"
-//
-//                                val imageCoords = getImageCoordinates(event.x, event.y)
-//                                imageCoords?.let { (x, y) ->
-//                                    val absoluteCoords = convertToAbsoluteCoords(x, y)
-//                                    absoluteCoords?.let { (absX, absY) ->
-//                                        websocketClient?.sendClick(absX, absY, 0, scrollDirection, "wheel")
-//                                        Log.d(TAG, "Скролл: $scrollDirection at $absX,$absY")
-//                                    }
-//                                }
-//
-//                                lastScrollY = event.y
-//                            }
-//                        }
-//
-//                        posX += dx
-//                        posY += dy
-//                        applyImageTransform()
-//
-//                        lastTouchX = event.x
-//                        lastTouchY = event.y
-//                    }
-//                } catch (e: Exception){
-//                    Log.e(TAG, "Ошибка при скролле", e)
-//                }
-//            }
-//
-//            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-//                cancelLongPress()
-//                isDragging = false
-//
-//                val imageCoords = getImageCoordinates(event.x, event.y)
-//                imageCoords?.let { (x, y) ->
-//                    val absoluteCoords = convertToAbsoluteCoords(x, y)
-//                    absoluteCoords?.let { (absX, absY) ->
-//                        websocketClient?.sendClick(absX, absY, 0, "up", "click")
-//                        Log.d(TAG, "Клик UP: X=$absX, Y=$absY, dClick=$dClick")
-//                    }
-//                }
-//
-//                isLongPressTriggered = false
-//                dClick = false
-//            }
-//        }
-//
-//        return true
-//    }
-    private fun startLongPressTimer(normalizedX: Float, normalizedY: Float) {
-        cancelLongPress()
-
-        longPressRunnable = Runnable {
-            isLongPressTriggered = true
-
-            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
-
-            if (absoluteCoords != null) {
-                val (absX, absY) = absoluteCoords
-                websocketClient?.sendClick(absX, absY, 1, "click", "click")
-                Log.d(TAG, "Долгое нажатие - правый клик: X=$absX, Y=$absY")
-            }
-        }
-
-        handler.postDelayed(longPressRunnable!!, LONG_PRESS_DELAY)
-    }
-
-    private fun cancelLongPress() {
-        longPressRunnable?.let {
-            handler.removeCallbacks(it)
-            longPressRunnable = null
-        }
-    }
     private fun getImageCoordinates(screenX: Float, screenY: Float): Pair<Float, Float>? {
         val drawable = imageView.drawable ?: return null
         val imageWidth = drawable.intrinsicWidth.toFloat()
@@ -810,7 +697,7 @@ class MainActivity : AppCompatActivity() {
                 frameTimeoutJob?.cancel()
 
                 lastFrameTime = 0L
-                delay(50)
+                delay(50.milliseconds)
                 runOnUiThread {
                     menuButton.disable()
                     keyboardButton.disable()
