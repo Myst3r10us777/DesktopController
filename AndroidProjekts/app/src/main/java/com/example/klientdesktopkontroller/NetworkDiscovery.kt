@@ -20,13 +20,6 @@ class NetworkDiscovery {
     private var discoveryThread: Thread? = null
     private var socket: DatagramSocket? = null
 
-    /**
-     * Поиск сервера в локальной сети
-     * @param onServerFound - вызывается при обнаружении сервера
-     * @param onError - вызывается при ошибке или таймауте
-     * @param timeoutSeconds - сколько секунд искать
-     * @param attempts - сколько раз отправлять broadcast
-     */
     fun discoverServers(
         onServerFound: (ip: String, port: Int, name: String) -> Unit,
         onError: (String) -> Unit,
@@ -47,7 +40,7 @@ class NetworkDiscovery {
                 socket?.soTimeout = TIMEOUT_MS
                 socket?.broadcast = true
 
-                Log.d(TAG, "🚀 Начинаем поиск сервера в сети...")
+                Log.d(TAG, "Начинаем поиск сервера в сети...")
 
                 // 2. Формируем broadcast сообщение
                 val messageBytes = DISCOVERY_MESSAGE.toByteArray()
@@ -65,12 +58,12 @@ class NetworkDiscovery {
                 for (attempt in 1..attempts) {
                     if (!isRunning) break
 
-                    Log.d(TAG, "📤 Отправка broadcast-запроса #$attempt...")
+                    Log.d(TAG, "Отправка broadcast-запроса #$attempt...")
 
                     try {
                         socket?.send(packet)
                     } catch (e: Exception) {
-                        Log.e(TAG, "❌ Ошибка отправки broadcast", e)
+                        Log.e(TAG, "Ошибка отправки broadcast", e)
                         continue
                     }
 
@@ -94,7 +87,7 @@ class NetworkDiscovery {
                                 receivePacket.length
                             )
 
-                            Log.d(TAG, "📨 Получен ответ от ${receivePacket.address.hostAddress}")
+                            Log.d(TAG, "Получен ответ от ${receivePacket.address.hostAddress}")
 
                             val json = JSONObject(responseData)
 
@@ -104,7 +97,7 @@ class NetworkDiscovery {
                                 val port = json.getInt("port")
                                 val name = json.optString("name", "Desktop Controller")
 
-                                Log.d(TAG, "✅ Найден сервер: $name @ $ip:$port")
+                                Log.d(TAG, "Найден сервер: $name @ $ip:$port")
 
                                 serverFound = true
                                 isRunning = false
@@ -120,10 +113,10 @@ class NetworkDiscovery {
 
                         } catch (e: SocketTimeoutException) {
                             // Таймаут - продолжаем ждать или следующую попытку
-                            Log.d(TAG, "⏰ Таймаут ожидания ответа")
+                            Log.d(TAG, "Таймаут ожидания ответа")
                             break
                         } catch (e: Exception) {
-                            Log.e(TAG, "❌ Ошибка получения ответа", e)
+                            Log.e(TAG, "Ошибка получения ответа", e)
                         }
                     }
                 }
