@@ -5,12 +5,99 @@ import cv2
 import numpy as np
 import base64
 import json
-from mss import mss
 import pyautogui
 import pyperclip
 import tkinter as tk
 from tkinter import ttk
 import threading
+import socket
+from mss import mss
+import ctypes
+
+class DiscoveryServer:
+    def __init__(self):
+        self.running = False
+        self.sock = None
+        self.thread = None
+        self.DISCOVERY_PORT = 8766
+        self.DISCOVERY_MESSAGE = "DISCOVER_DESKTOP_CONTROLLER"
+        self.server_ip = None
+
+    def start(self):
+        if self.running:
+            print("Discovery сервер уже запущен")
+            return
+
+        self.running = True
+        self.thread = threading.Thread(target=self._listen, daemon=True)
+        self.thread.start()
+        print(f"UDP Discovery запущен на порту {self.DISCOVERY_PORT}")
+
+    def _listen(self):
+        try:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+            self.sock.bind(('', self.DISCOVERY_PORT))
+            print(f"Слушаю порт {self.DISCOVERY_PORT} для discovery запросов")
+
+            self.server_ip = self._get_local_ip()
+            print(f"IP сервера: {self.server_ip}")
+
+            self.sock.settimeout(1)
+
+            while self.running:
+                try:
+                    data, addr = self.sock.recvfrom(1024)
+                    message = data.decode('utf-8')
+
+                    if message == self.DISCOVERY_MESSAGE:
+                        print(f"Получен discovery запрос от {addr[0]}:{addr[1]}")
+
+                        response = {
+                            "type": "discovery_response",
+                            "ip": self.server_ip,
+                            "port": 8765,
+                            "name": socket.gethostname(),
+                            "version": "1.0"
+                        }
+
+                        response_data = json.dumps(response).encode('utf-8')
+                        self.sock.sendto(response_data, addr)
+                        print(f"Отправлен ответ сервера: {self.server_ip}:8765")
+
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    if self.running:
+                        print(f"Ошибка в discovery: {e}")
+
+        except Exception as e:
+            print(f"Критическая ошибка discovery: {e}")
+        finally:
+            if self.sock:
+                self.sock.close()
+                print("Discovery сокет закрыт")
+
+    def _get_local_ip(self):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                return s.getsockname()[0]
+        except:
+            return socket.gethostbyname(socket.gethostname())
+
+    def stop(self):
+        print("Остановка Discovery сервера...")
+        self.running = False
+        if self.sock:
+            try:
+                self.sock.close()
+            except:
+                pass
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=2)
+        print("Discovery сервер выключен")
 
 class ScreenStreamer:
     def __init__(self):
@@ -21,6 +108,7 @@ class ScreenStreamer:
         self.paused = True
         self.server = None
         self.loop = None
+        self.discovery_server = None
 
     def init_mss(self):
         if self.sct is None:
@@ -34,54 +122,51 @@ class ScreenStreamer:
                 "0.0.0.0",
                 8765
             )
+
+            if not self.discovery_server:
+                self.discovery_server = DiscoveryServer()
+                self.discovery_server.start()
+
             self.paused = False
-            print("🚀 Сервер запущен на порту 8765")
+            print("Сервер запущен на порту 8765")
         else:
             if self.server:
                 self.server.close()
                 await self.server.wait_closed()
                 self.server = None
 
+            if self.discovery_server:
+                self.discovery_server.stop()
+                self.discovery_server = None
+
             if self.client is not None:
                 await self.client.close()
             self.client = None
 
             self.paused = True
-            print("⏹️ Сервер остановлен")
+            print("Сервер остановлен")
 
     async def handle_client(self, websocket):
-        # Если уже есть клиент - проверяем, жив ли он
-        if self.client is not None:
-            try:
-                if self.client.open:
-                    print("❌ Клиент уже подключен. Отказ в соединении.")
-                    await websocket.close(reason="Only one client allowed")
-                    return
-                else:
-                    self.client = None
-                    print("🔄 Обнаружен мёртвый клиент, очищаем...")
-            except:
-                self.client = None
-                print("🔄 Очищаем мёртвого клиента")
-        
+        if self.client and self.client.open:
+            await websocket.close(reason="Разрешен только один клиент")
+            return
         self.client = websocket
-        print("✅ Клиент подключен")
-        
+        print("Клиент подключен")
+
         try:
-            # Отправляем информацию о мониторах
             await self.send_monitors_info(websocket)
-            
-            # Запускаем трансляцию и обработку сообщений
+
             stream_task = asyncio.create_task(self.stream_screen(websocket))
             message_task = asyncio.create_task(self.handle_messages(websocket))
-            
+
             await asyncio.wait(
                 [stream_task, message_task],
                 return_when=asyncio.FIRST_COMPLETED
             )
-            
+
         except Exception as e:
-            print(f"❌ Ошибка: {e}")
+            print(f"Ошибка: {e}")
+            
         finally:
             if 'stream_task' in locals():
                 stream_task.cancel()
@@ -89,19 +174,19 @@ class ScreenStreamer:
                 message_task.cancel()
             if self.client == websocket:
                 self.client = None
-                print("👋 Клиент отключен")
+                print("Клиент отключен")
 
     async def send_monitors_info(self, websocket):
         try:
             sct = self.init_mss()
             monitors = sct.monitors
-            
+
             monitors_info = {
                 "type": "monitors_info",
                 "monitors_count": len(monitors) - 1,
                 "monitors": []
             }
-            
+
             for i, monitor in enumerate(monitors):
                 if i == 0:
                     continue
@@ -112,21 +197,18 @@ class ScreenStreamer:
                     "width": monitor["width"],
                     "height": monitor["height"]
                 })
-            
+
             await websocket.send(json.dumps(monitors_info))
-            print(f"📊 Отправлена информация о {len(monitors) - 1} мониторах")
-            
+            print(f"Отправлена информация о {len(monitors) - 1} мониторах")
+
         except Exception as e:
-            print(f"❌ Ошибка отправки информации о мониторах: {e}")
+            print(f"Ошибка отправки информации о мониторах: {e}")
 
     async def handle_messages(self, websocket):
-        """Обработка входящих сообщений от клиента"""
         async for message in websocket:
-            # ✅ ИСПРАВЛЕНО: передаём только message
             asyncio.create_task(self.process_message(message))
 
-    async def process_message(self, message):  # ✅ ТОЛЬКО ОДИН ПАРАМЕТР
-        """Асинхронная обработка сообщения"""
+    async def process_message(self, message):
         try:
             data = json.loads(message)
             message_type = data.get("type")
@@ -136,28 +218,27 @@ class ScreenStreamer:
             elif message_type == "text":
                 await self.handle_text(data)
             elif message_type == "monitor":
-                await self.GetMonitor(data)
+                await self.getMonitor(data)
             else:
-                print(f"📨 Неизвестный тип сообщения: {message_type}")
+                print(f"Неизвестный тип сообщения: {message_type}")
 
         except Exception as e:
-            print(f"❌ Ошибка обработки сообщения: {e}")
+            print(f"Ошибка обработки сообщения: {e}")
 
     async def handle_text(self, data):
         try:
             text = data.get("text", "")
             if not text:
-                print("❌ Пустой текст")
+                print("Пустой текст")
                 return
 
-            print(f"📝 Получен текст для вставки: '{text}'")
+            print(f"Получен текст для вставки: '{text}'")
             await asyncio.to_thread(self._paste_text, text)
 
         except Exception as e:
-            print(f"❌ Ошибка при вставке текста: {e}")
+            print(f"Ошибка при вставке текста: {e}")
 
     def _paste_text(self, text):
-        import ctypes
         pyperclip.copy(text)
         ctypes.windll.user32.keybd_event(0x11, 0, 0, 0)
         ctypes.windll.user32.keybd_event(0x56, 0, 0, 0)
@@ -173,19 +254,19 @@ class ScreenStreamer:
             click_type = data.get("click_type", "click")
 
             if x is None or y is None:
-                print(f"❌ Неверные координаты: x={x}, y={y}")
+                print(f"Неверные координаты: x={x}, y={y}")
                 return
 
-            if isinstance(x, float) and 0 <= x <= 1 and isinstance(y, float) and 0 <= y <= 1:
-                absolute_x = int(x * self.screen_width)
-                absolute_y = int(y * self.screen_height)
-                print(f"  📏 Нормализованные -> абсолютные: ({x}, {y}) -> ({absolute_x}, {absolute_y})")
-            else:
-                absolute_x = int(x)
-                absolute_y = int(y)
-                print(f"  📏 Абсолютные координаты: ({absolute_x}, {absolute_y})")
+            absolute_x = int(x)
+            absolute_y = int(y)
+            print(f"Абсолютные координаты: ({absolute_x}, {absolute_y})")
 
-            button_str = 'left' if button == 0 else 'right' if button == 1 else 'middle'
+            if button == 0:
+                button_str = 'left'
+            elif button == 1:
+                button_str = 'right'
+            else:
+                button_str = 'middle'
 
             if click_type == "click":
                 if action == "down":
@@ -195,40 +276,31 @@ class ScreenStreamer:
                 elif action == "click":
                     await asyncio.to_thread(pyautogui.click, absolute_x, absolute_y, button=button_str)
                 else:
-                    print(f"❌ Неизвестное действие мыши: {action}")
+                    print(f"Неизвестное действие мыши: {action}")
 
             elif click_type == "wheel":
                 scroll_amount = -20 if action == "up" else 20
                 await asyncio.to_thread(pyautogui.scroll, scroll_amount, absolute_x, absolute_y)
             else:
-                print(f"❌ Неизвестный тип клика: {click_type}")
+                print(f"Неизвестный тип клика: {click_type}")
 
         except Exception as e:
-            print(f"❌ Ошибка обработки клика: {e}")
+            print(f"Ошибка обработки клика: {e}")
 
-    async def GetMonitor(self, data):
+    async def getMonitor(self, data):
         try:
             monitor = data.get("data", 1)
-            sct = self.init_mss()
-
-            if monitor < 1 or monitor >= len(sct.monitors):
-                print(f"❌ Монитор {monitor} не существует. Доступно: {len(sct.monitors)-1}")
-                return
-
             self.current_monitor = monitor
-            print(f"🖥️ Переключен на монитор {monitor}")
+            print(f"Переключен на монитор {monitor}")
 
         except Exception as e:
-            print(f"❌ Ошибка при переключении монитора: {e}")
+            print(f"Ошибка при переключении монитора: {e}")
 
     async def stream_screen(self, websocket):
         try:
             sct = self.init_mss()
             
             while True:
-                if self.paused:
-                    await asyncio.sleep(0.1)
-                    continue
                 
                 if self.client is None:
                     break
@@ -236,10 +308,9 @@ class ScreenStreamer:
                 monitor = sct.monitors[self.current_monitor]
                 screenshot = sct.grab(monitor)
                 frame = np.array(screenshot)
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
                 
                 _, buffer = cv2.imencode('.jpg', frame, [
-                    cv2.IMWRITE_JPEG_QUALITY, 60
+                    cv2.IMWRITE_JPEG_QUALITY, 70
                 ])
                 
                 message = json.dumps({
@@ -251,35 +322,34 @@ class ScreenStreamer:
                     await websocket.send(message)
                 except:
                     break
-                
-                await asyncio.sleep(0.05)  # 20 FPS
-                
+
+            # await asyncio.sleep(0.01)
+            
         except Exception as e:
             print(f"❌ Ошибка захвата: {e}")
 
 class StreamerApp:
     def __init__(self):
-        if os.name == 'nt':
-            try:
-                import ctypes
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('com.yourcompany.desktopcontroller.1.0')
-                print("✅ AppUserModelID установлен")
-            except Exception as e:
-                print(f"⚠️ Не удалось установить AppUserModelID: {e}")
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                'DesktopController'
+            )
+        except Exception as e:
+            print(f"Не удалось установить AppUserModelID (имя программы): {e}")
 
         self.root = tk.Tk()
         self.root.title("Desktop Controller")
         self.root.geometry("650x500")
         self.root.resizable(False, False)
+        self.root.configure(bg='#131418')
 
         try:
             if os.path.exists("ico.ico"):
                 self.root.iconbitmap("ico.ico")
-                print("✅ Иконка установлена")
             else:
-                print("⚠️ Файл ico.ico не найден")
+                print("Файл ico.ico не найден")
         except Exception as e:
-            print(f"⚠️ Не удалось загрузить иконку: {e}")
+            print(f"Не удалось загрузить иконку: {e}")
 
         self.streamer = ScreenStreamer()
         self.asyncio_thread = None
@@ -289,34 +359,60 @@ class StreamerApp:
 
     def setup_ui(self):
         style = ttk.Style()
-        style.configure("Blue.TFrame", background="#131418")
-        style.configure("Title.TLabel", background="#131418", foreground="#f3f3f3", font=("Segoe UI", 25, "bold"))
-        style.configure("Orange.TLabel", background="#131418", foreground="#0ea3fc", font=("Segoe UI", 15))
-        style.configure("Status.TLabel", background="#131418", foreground="red", font=("Segoe UI", 15))
-        style.configure("Large.TButton", font=("Arial", 15))
+        style.configure("Background.TFrame", background="#131418")
+        style.configure("Title.TLabel", background="#131418", foreground="#f3f3f3", font=("Segoe UI", 28, "bold"))
+        style.configure("Subtitle.TLabel", background="#131418", foreground="#0ea3fc", font=("Segoe UI", 13))
+        style.configure("Info.TLabel", background="#131418", foreground="#888888", font=("Segoe UI", 11))
+        style.configure("StatusOn.TLabel", background="#131418", foreground="#4CAF50", font=("Segoe UI", 13, "bold"))
+        style.configure("StatusOff.TLabel", background="#131418", foreground="#ff6b6b", font=("Segoe UI", 13, "bold"))
 
-        main_frame = ttk.Frame(self.root, padding="20", style="Blue.TFrame")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ttk.Frame(self.root, padding="30", style="Background.TFrame")
+        main_frame.pack(fill=tk.BOTH)
 
-        ttk.Label(main_frame, text="Desktop Controller", style="Title.TLabel").pack(pady=(0, 20))
+        title_label = ttk.Label(main_frame, text="Desktop Controller", style="Title.TLabel")
+        title_label.pack()
 
-        ttk.Label(main_frame, 
-                 text="◆ Как использовать:\nУбедитесь что сервер и клиент находятся в одной сети Wi-Fi\n"
-                      "\n◆ В меню можно:\n• Переключить просматриваемый монитор\n"
-                      "• Вставить текст",
-                 style="Orange.TLabel").pack(pady=5)
-
-        self.toggle_button = ttk.Button(
+        subtitle_label = ttk.Label(
             main_frame,
-            text="ВКЛЮЧИТЬ СЕРВЕР",
-            command=self.toggle_streaming,
-            style="Large.TButton",
-            padding=(20, 7)
+            text="Управление компьютером с телефона",
+            style="Subtitle.TLabel"
         )
-        self.toggle_button.pack(pady=10)
+        subtitle_label.pack(pady=(0, 30))
 
-        self.status_label = ttk.Label(main_frame, text="Статус: Остановлен", style="Status.TLabel")
-        self.status_label.pack(pady=5)
+        self.btn_server = RoundedButton(
+            main_frame,
+            text="▶ ВКЛЮЧИТЬ СЕРВЕР",
+            command=self.toggle_streaming
+        )
+        self.btn_server.pack(pady=10)
+
+        self.status_label = ttk.Label(
+            main_frame,
+            text="Сервер остановлен",
+            style="StatusOff.TLabel"
+        )
+        self.status_label.pack(pady=(10, 25))
+
+        info_frame = ttk.Frame(main_frame, style="Background.TFrame")
+        info_frame.pack(fill=tk.X)
+
+        info_lines = [
+            "◆ Как использовать:",
+            "  • Убедитесь что сервер и клиент в одной сети Wi-Fi",
+            "",
+            "◆ В меню можно:",
+            "  • Переключить просматриваемый монитор",
+            "  • Вставить текст"
+        ]
+
+        for line in info_lines:
+            color = "#0ea3fc" if line.startswith("◆") else "#888888"
+            if line.startswith("  "):
+                label = ttk.Label(info_frame, text=line, foreground=color, background="#131418", font=("Segoe UI", 11))
+                label.pack(anchor=tk.W, padx=(15, 0))
+            else:
+                label = ttk.Label(info_frame, text=line, foreground=color, background="#131418", font=("Segoe UI", 12))
+                label.pack(anchor=tk.W)
 
     def toggle_streaming(self):
         if not self.is_running:
@@ -328,30 +424,24 @@ class StreamerApp:
         self.is_running = True
         self.asyncio_thread = threading.Thread(target=self.run_async, daemon=True)
         self.asyncio_thread.start()
-        print("🚀 Стриминг запущен")
+        print("Стриминг запущен")
         self.root.after(0, self._update_ui_started)
 
     def _update_ui_started(self):
-        self.toggle_button.config(text="ВЫКЛЮЧИТЬ СЕРВЕР")
-        self.status_label.config(text="Статус: Запущен", foreground="green")
-        style = ttk.Style()
-        style.configure("Stop.TButton", font=("Arial", 15), foreground="black")
-        self.toggle_button.configure(style="Stop.TButton")
+        self.btn_server.itemconfig(self.btn_server.text_id, text="■ ВЫКЛЮЧИТЬ СЕРВЕР")
+        self.status_label.config(text="Сервер запущен", style="StatusOn.TLabel")
 
     def stop_streaming(self):
         self.is_running = False
         self.streamer.current_monitor = 1
         if hasattr(self.streamer, 'loop') and self.streamer.loop:
             asyncio.run_coroutine_threadsafe(self.streamer.toggle_server(), self.streamer.loop)
-        print("⏸️ Стриминг остановлен")
+        print("Стриминг остановлен")
         self.root.after(0, self._update_ui_stopped)
 
     def _update_ui_stopped(self):
-        self.toggle_button.config(text="ВКЛЮЧИТЬ СЕРВЕР")
-        self.status_label.config(text="Статус: Остановлен", foreground="red")
-        style = ttk.Style()
-        style.configure("Large.TButton", font=("Arial", 15))
-        self.toggle_button.configure(style="Large.TButton")
+        self.btn_server.itemconfig(self.btn_server.text_id, text="▶ ВКЛЮЧИТЬ СЕРВЕР")
+        self.status_label.config(text="Сервер остановлен", style="StatusOff.TLabel")
 
     def run_async(self):
         self.streamer.loop = asyncio.new_event_loop()
@@ -367,6 +457,85 @@ class StreamerApp:
         finally:
             if self.is_running:
                 self.stop_streaming()
+
+class RoundedButton(tk.Canvas):
+    def __init__(self, master, text="Button", width=280, height=60,
+                 radius=50, bg_color="#0ea3fc", hover_color="#1a8bc4",
+                 text_color="white", font=("Segoe UI", 16, "bold"),
+                 command=None, **kwargs):
+
+        super().__init__(master, width=width, height=height,
+                        highlightthickness=0, bg='#131418', **kwargs)
+
+        self.width = width
+        self.height = height
+        self.radius = radius
+        self.bg_color = bg_color
+        self.hover_color = hover_color
+        self.text_color = text_color
+        self.font = font
+        self.darker_color = "#187cad"
+        self.command = command
+        self.is_hovered = False
+        self.is_pressed = False
+
+        self.bg_rect = self.create_rounded_rect(
+            radius,
+            0, 0, width, height,
+            fill=bg_color,
+            outline=bg_color
+        )
+
+        self.text_id = self.create_text(
+            width // 2, height // 2,
+            text=text,
+            fill=text_color,
+            font=font,
+            anchor="center"
+        )
+
+        self.bind("<Enter>", self.on_enter)
+        self.bind("<Leave>", self.on_leave)
+        self.bind("<Button-1>", self.on_press)
+        self.bind("<ButtonRelease-1>", self.on_release)
+
+    def create_rounded_rect(self, radius, x1, y1, x2, y2, **kwargs):
+
+        points = [
+            x1 + radius, y1,
+            x2 - radius, y1,
+            x2, y1,
+            x2, y1 + radius,
+            x2, y2 - radius,
+            x2, y2,
+            x2 - radius, y2,
+            x1 + radius, y2,
+            x1, y2,
+            x1, y2 - radius,
+            x1, y1 + radius,
+            x1, y1
+        ]
+        return self.create_polygon(points, smooth=True, **kwargs)
+
+    def on_enter(self, event):
+        self.is_hovered = True
+        if not self.is_pressed:
+            self.itemconfig(self.bg_rect, fill=self.hover_color, outline=self.hover_color)
+
+    def on_leave(self, event):
+        self.is_hovered = False
+        if not self.is_pressed:
+            self.itemconfig(self.bg_rect, fill=self.bg_color, outline=self.bg_color)
+
+    def on_press(self, event):
+        self.is_pressed = True
+        self.itemconfig(self.bg_rect, fill=self.darker_color, outline=self.darker_color)
+
+    def on_release(self, event):
+        self.is_pressed = False
+        self.itemconfig(self.bg_rect, fill=self.hover_color, outline=self.hover_color)
+
+        self.command()
 
 if __name__ == "__main__":
     app = StreamerApp()
