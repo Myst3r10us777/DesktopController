@@ -1,0 +1,30 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color white
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+drawable rounded_corners
+id Keyboard
+id TextKeyBoard
+id button
+id constraintLayout
+id drawerLayout
+id imageView
+id menuButton
+id menu_desktop_1
+id menu_desktop_2
+id menu_desktop_3
+id menu_disconnect
+id navigationView
+id text
+layout activity_main
+menu side_menu
+mipmap ic_launcher
+mipmap ic_launcher_foreground
+mipmap ic_launcher_round
+string app_name
+style Base.Theme.KlientDesktopKontroller
+style Theme.KlientDesktopKontroller
+xml backup_rules
+xml data_extraction_rules
