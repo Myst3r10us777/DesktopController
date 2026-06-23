@@ -1,16 +1,10 @@
 import asyncio
-import os
 import websockets
 import cv2
 import numpy as np
 import base64
 import json
 from mss import mss
-import pyautogui
-import pyperclip
-import tkinter as tk
-from tkinter import ttk
-import threading
 
 import socket
 import json
@@ -389,7 +383,7 @@ class StreamerApp:
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('com.yourcompany.desktopcontroller.1.0')
                 print("✅ AppUserModelID установлен")
             except Exception as e:
-                print(f"⚠️ Не удалось установить AppUserModelID: {e}")
+                print(f"Ошибка захвата: {e}")
 
         self.root = tk.Tk()
         self.root.title("Desktop Controller")

@@ -8,9 +8,13 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Trace.isEnabled
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Base64
 import android.util.Log
 import android.view.GestureDetector
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -24,10 +28,13 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.example.klientdesktopkontroller.WebSocketClient
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,10 +43,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
-import com.example.klientdesktopkontroller.WebSocketClient as MyWebSocketClient
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
+import com.example.klientdesktopkontroller.WebSocketClient as MyWebSocketClient
 
 class MainActivity : AppCompatActivity() {
 
@@ -65,11 +74,13 @@ class MainActivity : AppCompatActivity() {
     private var posX = 0f
     private var posY = 0f
     private lateinit var keyboardInputField: EditText
+
     private var lastFrameTime = 0L
     private val frameTimeout = 3000L
     private val frameTimeoutCheckInterval = 500L
     private var frameTimeoutJob: Job? = null
     private val matrix = Matrix()
+
     private var currentMonitor = 1
     private var monitorsInfo: List<MonitorInfo> = listOf()
 
@@ -97,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     //определение кнопок и т.п
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -377,6 +389,7 @@ class MainActivity : AppCompatActivity() {
 
     //подключение к серверу
     private fun startAutoDiscovery() {
+        text.text = "🔍 Поиск сервера..."
         button.isEnabled = false
         button.text = "Поиск..."
         text.text = "Поиск сервера в сети..."
@@ -387,7 +400,6 @@ class MainActivity : AppCompatActivity() {
         discovery?.discoverServers(
             onServerFound = { ip, port, name ->
                 Log.d(TAG, "Сервер найден: $name @ $ip:$port")
-
                 runOnUiThread {
                     text.text = "Найден сервер: $name\nПодключение..."
                     connectToWebSocket(URI("ws://$ip:$port"))
@@ -397,7 +409,6 @@ class MainActivity : AppCompatActivity() {
             },
             onError = { error ->
                 Log.e(TAG, "Ошибка поиска: $error")
-
                 runOnUiThread {
                     text.text = "❌ $error\n\n" +
                             "Проверьте:\n" +
@@ -425,11 +436,8 @@ class MainActivity : AppCompatActivity() {
                     "frame" -> {
                         lastFrameTime = System.currentTimeMillis()
                         runOnUiThread {
-                            text.text = ""
-                            text.visibility = View.GONE
-                            button.disable()
-                            menuButton.enable()
-                            keyboardButton.enable()
+                            menuButton.isEnabled = true
+                            menuButton.visibility = View.VISIBLE
                         }
                         val frameData = jsonObject.getString("data")
                         val bitmap = decodeBase64ToBitmap(frameData)
@@ -442,7 +450,6 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-
                     "monitors_info" -> {
                         val monitorsCount = jsonObject.getInt("monitors_count")
                         val monitorsArray = jsonObject.getJSONArray("monitors")
@@ -507,11 +514,8 @@ class MainActivity : AppCompatActivity() {
             try {
                 Log.d(TAG, "Подключаюсь к $uri...")
 
-                websocketClient = MyWebSocketClient(uri, object : MyWebSocketClient.Listener {
+                websocketClient = WebSocketClient(uri, object : WebSocketClient.Listener {
                     override fun onMessage(message: String) {
-                        runOnUiThread {
-                            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                        }
                         handleWebSocketMessage(message)
                     }
 
@@ -536,8 +540,9 @@ class MainActivity : AppCompatActivity() {
 //                    }
 
                     override fun onClosing(code: Int, reason: String?) {
+                        Log.d(TAG, "Соединение закрыто: $reason")
                         runOnUiThread {
-                            text.text = "❌ Ошибка подключения\n"
+                            text.text = "📞 Соединение закрыто"
                             button.text = "Подключиться"
                             button.isEnabled = true
                             menuButton.disable()
@@ -560,6 +565,14 @@ class MainActivity : AppCompatActivity() {
                 websocketClient?.connect()
 
                 delay(2000)
+
+                if (websocketClient?.isOpen == true) {
+                    runOnUiThread {
+                        text.text = "✅ Подключено!\n🎥 Трансляция началась..."
+                        button.text = "Отключиться"
+                        button.isEnabled = true
+                    }
+                }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при подключении", e)
@@ -586,8 +599,8 @@ class MainActivity : AppCompatActivity() {
 
             text.text = "Связь с сервером потеряна. Пытаемся повторно подключиться"
             button.isEnabled = false
-            menuButton.disable()
-            keyboardButton.disable()
+            menuButton.isEnabled = false
+            menuButton.visibility = View.GONE
 
             scaleFactor = 1.0f
             posX = 0f
@@ -632,6 +645,7 @@ class MainActivity : AppCompatActivity() {
 
         if (currentMonitorInfo == null) {
             Log.e(TAG, "convertToAbsoluteCoords: монитор $currentMonitor не найден в monitorsInfo: ${monitorsInfo.map { it.number }}")
+
             return null
         }
 
@@ -643,7 +657,6 @@ class MainActivity : AppCompatActivity() {
 
         return Pair(absoluteX, absoluteY)
     }
-
     private fun getImageCoordinates(screenX: Float, screenY: Float): Pair<Float, Float>? {
         val drawable = imageView.drawable ?: return null
         val imageWidth = drawable.intrinsicWidth.toFloat()
@@ -706,7 +719,6 @@ class MainActivity : AppCompatActivity() {
                     button.isEnabled = true
                     button.text = "Подключиться"
                 }
-                Toast.makeText(this@MainActivity, "ПОДТВЕРЖДЕНИЕ", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при отключении", e)
             }
@@ -716,11 +728,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
 
-        discovery?.stopDiscovery()
-
         disconnectFromWebSocket()
         websocketJob?.cancel()
         discoveryJob?.cancel()
-        frameTimeoutJob?.cancel()
     }
 }

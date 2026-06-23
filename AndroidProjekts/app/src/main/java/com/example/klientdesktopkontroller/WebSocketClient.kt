@@ -5,7 +5,6 @@ import org.java_websocket.handshake.ServerHandshake
 import java.lang.Exception
 import java.net.URI
 import org.json.JSONObject
-import java.nio.ByteBuffer
 
 class WebSocketClient(
     serverUri: URI,
