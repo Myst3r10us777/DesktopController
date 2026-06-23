@@ -108,7 +108,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     //определение кнопок и т.п
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -401,10 +400,11 @@ class MainActivity : AppCompatActivity() {
             onServerFound = { ip, port, name ->
                 Log.d(TAG, "Сервер найден: $name @ $ip:$port")
                 runOnUiThread {
-                    text.text = "Найден сервер: $name\nПодключение..."
                     connectToWebSocket(URI("ws://$ip:$port"))
                     menuButton.enable()
                     keyboardButton.enable()
+                    button.disable()
+                    text.text = ""
                 }
             },
             onError = { error ->
@@ -542,7 +542,7 @@ class MainActivity : AppCompatActivity() {
                     override fun onClosing(code: Int, reason: String?) {
                         Log.d(TAG, "Соединение закрыто: $reason")
                         runOnUiThread {
-                            text.text = "📞 Соединение закрыто"
+                            text.text = "Соединение закрыто"
                             button.text = "Подключиться"
                             button.isEnabled = true
                             menuButton.disable()
@@ -565,14 +565,6 @@ class MainActivity : AppCompatActivity() {
                 websocketClient?.connect()
 
                 delay(2000)
-
-                if (websocketClient?.isOpen == true) {
-                    runOnUiThread {
-                        text.text = "✅ Подключено!\n🎥 Трансляция началась..."
-                        button.text = "Отключиться"
-                        button.isEnabled = true
-                    }
-                }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при подключении", e)
@@ -716,8 +708,7 @@ class MainActivity : AppCompatActivity() {
                     keyboardButton.disable()
                     text.text = "Вы оключились"
                     imageView.visibility = ImageView.GONE
-                    button.isEnabled = true
-                    button.text = "Подключиться"
+                    button.enable()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при отключении", e)
