@@ -219,11 +219,28 @@ class ScreenStreamer:
                 await self.handle_text(data)
             elif message_type == "monitor":
                 await self.getMonitor(data)
+            elif message_type == "keyboard":
+                await self.handle_keyboard(data)
             else:
                 print(f"Неизвестный тип сообщения: {message_type}")
 
         except Exception as e:
             print(f"Ошибка обработки сообщения: {e}")
+
+    async def handle_keyboard(self, data):
+        try:
+            action = data.get("action")
+            
+            if action == "backspace":
+                print("Backspace нажат")
+                await asyncio.to_thread(pyautogui.click)
+                await asyncio.sleep(0.05)
+                await asyncio.to_thread(self._press_backspace)
+            else:
+                print(f"Неизвестное действие клавиатуры: {action}")
+                
+        except Exception as e:
+            print(f"Ошибка обработки клавиатурного события: {e}")
 
     async def handle_text(self, data):
         try:
@@ -244,6 +261,10 @@ class ScreenStreamer:
         ctypes.windll.user32.keybd_event(0x56, 0, 0, 0)
         ctypes.windll.user32.keybd_event(0x56, 0, 2, 0)
         ctypes.windll.user32.keybd_event(0x11, 0, 2, 0)
+
+    def _press_backspace(self):
+        ctypes.windll.user32.keybd_event(0x08, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(0x08, 0, 2, 0)
 
     async def handle_click(self, data):
         try:

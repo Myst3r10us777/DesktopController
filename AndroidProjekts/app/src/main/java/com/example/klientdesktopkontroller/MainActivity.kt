@@ -33,6 +33,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.core.view.isVisible
 import androidx.drawerlayout.widget.DrawerLayout
 import com.example.klientdesktopkontroller.WebSocketClient
 import com.google.android.material.navigation.NavigationView
@@ -55,8 +56,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var button: Button
 
     private lateinit var menuButton: Button
-
     private lateinit var keyboardButton: Button
+    private lateinit var backspaceButton: Button
     private lateinit var text: TextView
     private lateinit var imageView: ImageView
 
@@ -120,6 +121,7 @@ class MainActivity : AppCompatActivity() {
         keyboardInputField = findViewById(R.id.TextKeyBoard)
         menuButton = findViewById<Button>(R.id.menuButton)
         keyboardButton = findViewById<Button>(R.id.Keyboard)
+        backspaceButton = findViewById<Button>(R.id.btn_backspace)
         menuButton.disable()
         keyboardButton.disable()
         menuButton.setOnClickListener {
@@ -132,6 +134,10 @@ class MainActivity : AppCompatActivity() {
 
         keyboardButton.setOnClickListener {
             Keyboard()
+        }
+
+        backspaceButton.setOnClickListener {
+            sendBackspace()
         }
 
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
@@ -166,9 +172,11 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             if (keyboardInputField.visibility == View.VISIBLE){
                 keyboardInputField.visibility = View.GONE
+                backspaceButton.disable()
                 return@runOnUiThread
             }
             keyboardInputField.visibility = View.VISIBLE
+            backspaceButton.enable()
             keyboardInputField.setText("")
             keyboardInputField.requestFocus()
 
@@ -183,6 +191,7 @@ class MainActivity : AppCompatActivity() {
 
                     keyboardInputField.visibility = View.GONE
                     keyboardInputField.setText("")
+                    backspaceButton.disable()
                     true
                 } else {
                     false
@@ -206,7 +215,6 @@ class MainActivity : AppCompatActivity() {
         val text = keyboardInputField.text.toString().trim()
         if (text.isNotEmpty()) {
             try {
-
                 websocketClient?.sendText(text)
                 Log.d(TAG, "Текст отправлен: $text")
 
@@ -214,7 +222,18 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Ошибка отправки текста", e)
             }
         }
+    }
 
+    private fun sendBackspace(){
+        runOnUiThread {
+            try {
+                websocketClient?.sendBackspace()
+                Log.d(TAG, "Backspace нажат")
+            } catch (e: Exception){
+                Log.e(TAG, "Ошибка нажатия backspace", e)
+            }
+
+        }
     }
 
     private fun setupTouchListener() {
