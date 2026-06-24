@@ -589,10 +589,9 @@ class MainActivity : AppCompatActivity() {
             imageView.setImageBitmap(null)
             imageView.visibility = View.GONE
 
-            text.text = "Связь с сервером потеряна. Пытаемся повторно подключиться"
-            button.isEnabled = false
-            menuButton.isEnabled = false
-            menuButton.visibility = View.GONE
+            text.text = "Связь с сервером потеряна. Повторное подключение..."
+            button.disable()
+            menuButton.disable()
 
             scaleFactor = 1.0f
             posX = 0f
