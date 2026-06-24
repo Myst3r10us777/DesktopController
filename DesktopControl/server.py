@@ -5,7 +5,10 @@ import numpy as np
 import base64
 import json
 from mss import mss
-
+import os
+import tkinter as tk
+import pyautogui
+from tkinter import ttk
 import socket
 import json
 import threading
