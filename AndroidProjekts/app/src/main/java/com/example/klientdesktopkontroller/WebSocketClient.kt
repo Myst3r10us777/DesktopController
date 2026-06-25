@@ -19,6 +19,7 @@ class WebSocketClient(
     }
 
     private var currentMonitor = 1
+    private var TAG = "WebSocket"
 
     fun sendClick(absoluteX: Int, absoluteY: Int, button: Int, action: String, type: String) {
         try {
@@ -33,9 +34,9 @@ class WebSocketClient(
             }
 
             send(json.toString())
-            Log.d("WebSocket", "🖱️ Отправлен абсолютный клик: $action ($type) at $absoluteX,$absoluteY")
+            Log.d(TAG, "🖱️ Отправлен абсолютный клик: $action ($type) at $absoluteX,$absoluteY")
         } catch (e: Exception) {
-            Log.e("WebSocket", "❌ Ошибка отправки клика", e)
+            Log.e(TAG, "❌ Ошибка отправки клика", e)
         }
     }
 
@@ -46,7 +47,19 @@ class WebSocketClient(
                 .put("text", text)
             send(json.toString())
         } catch (e: Exception) {
-            Log.e("WebSocket", "❌ Ошибка отправки текста", e)
+            Log.e(TAG, "❌ Ошибка отправки текста", e)
+        }
+    }
+
+    fun sendBackspace(){
+        try{
+            val json = JSONObject()
+                .put("type", "keyboard")
+                .put("action", "backspace")
+            send(json.toString())
+            Log.d(TAG, "Отправлен backspace")
+        } catch (e: Exception){
+            Log.e(TAG, "Ошибка отправки backspace", e)
         }
     }
 
@@ -58,12 +71,12 @@ class WebSocketClient(
             send(json.toString())
             currentMonitor=desktopNumber
         } catch (e: java.lang.Exception) {
-            Log.e("WebSocket", "❌ Ошибка переключения монитора", e)
+            Log.e(TAG, "❌ Ошибка переключения монитора", e)
         }
     }
 
     override fun onOpen(handshakedata: ServerHandshake?) {
-        Log.d("WebSocket", "Подключение установлено")
+        Log.d(TAG, "Подключение установлено")
     }
 
     override fun onMessage(message: String?) {

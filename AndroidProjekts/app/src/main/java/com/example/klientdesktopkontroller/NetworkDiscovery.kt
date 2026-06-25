@@ -127,7 +127,7 @@ class NetworkDiscovery {
                     Log.d(TAG, "❌ Сервер не найден за отведенное время")
 
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        onError("Сервер не найден в сети.\nПроверьте, что сервер запущен и устройства в одной сети.")
+                        onError("Сервер не найден в сети.")
                     }
                 }
 
