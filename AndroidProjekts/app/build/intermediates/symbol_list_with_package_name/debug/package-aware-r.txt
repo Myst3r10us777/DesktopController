@@ -2970,6 +2970,7 @@ drawable abc_textfield_search_material
 drawable abc_vector_test
 drawable avd_hide_password
 drawable avd_show_password
+drawable backspace_btn
 drawable btn_checkbox_checked_mtrl
 drawable btn_checkbox_checked_to_unchecked_mtrl_animation
 drawable btn_checkbox_unchecked_mtrl
@@ -3179,6 +3180,7 @@ id bounce
 id bounceBoth
 id bounceEnd
 id bounceStart
+id btn_backspace
 id button
 id buttonPanel
 id cache_measures

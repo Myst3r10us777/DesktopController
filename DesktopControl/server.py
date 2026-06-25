@@ -5,12 +5,10 @@ import cv2
 import numpy as np
 import base64
 import json
-
 import pyautogui
 import pyperclip
 import tkinter as tk
 from tkinter import ttk
-
 import threading
 import socket
 from mss import mss
@@ -320,36 +318,70 @@ class ScreenStreamer:
             print(f"Ошибка при переключении монитора: {e}")
 
     async def stream_screen(self, websocket):
+        sct = None
+        consecutive_errors = 0
+        max_errors = 5
+        
         try:
-            sct = self.init_mss()
-            
             while True:
-                
-                if self.client is None:
+                if self.client is None or self.client != websocket:
                     break
-                
-                monitor = sct.monitors[self.current_monitor]
-                screenshot = sct.grab(monitor)
-                frame = np.array(screenshot)
-                
-                _, buffer = cv2.imencode('.jpg', frame, [
-                    cv2.IMWRITE_JPEG_QUALITY, 70
-                ])
-                
-                message = json.dumps({
-                    "type": "frame",
-                    "data": base64.b64encode(buffer).decode('utf-8')
-                })
                 
                 try:
-                    await websocket.send(message)
-                except:
-                    break
-
-            # await asyncio.sleep(0.01)
-            
+                    if sct is None:
+                        import mss
+                        sct = mss.mss()
+                        print(f"✅ MSS инициализирован (поток: {threading.current_thread().name})")
+                    
+                    monitor = sct.monitors[self.current_monitor]
+                    screenshot = sct.grab(monitor)
+                    frame = np.array(screenshot)
+                    
+                    _, buffer = cv2.imencode('.jpg', frame, [
+                        cv2.IMWRITE_JPEG_QUALITY, 70
+                    ])
+                    
+                    message = json.dumps({
+                        "type": "frame",
+                        "data": base64.b64encode(buffer).decode('utf-8')
+                    })
+                    
+                    try:
+                        await websocket.send(message)
+                        consecutive_errors = 0
+                    except Exception as e:
+                        print(f"❌ Ошибка отправки кадра: {e}")
+                        break
+                    
+                    await asyncio.sleep(0.01)
+                    
+                except Exception as e:
+                    consecutive_errors += 1
+                    print(f"❌ Ошибка захвата кадра ({consecutive_errors}/{max_errors}): {e}")
+                    
+                    try:
+                        if sct:
+                            sct.close()
+                    except:
+                        pass
+                    sct = None
+                    
+                    if consecutive_errors >= max_errors:
+                        print("❌ Слишком много ошибок захвата, прерываем стриминг")
+                        break
+                    
+                    #await asyncio.sleep(0.1)
+                    
         except Exception as e:
-            print(f"❌ Ошибка захвата: {e}")
+            print(f"❌ Критическая ошибка stream_screen: {e}")
+        finally:
+            try:
+                if sct:
+                    sct.close()
+                    print("🔌 MSS закрыт")
+            except:
+                pass
+            print("⏹️ Поток стриминга завершен")
 
 class StreamerApp:
     def __init__(self):

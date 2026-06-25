@@ -429,12 +429,8 @@ class MainActivity : AppCompatActivity() {
             onError = { error ->
                 Log.e(TAG, "Ошибка поиска: $error")
                 runOnUiThread {
-                    text.text = "❌ $error\n\n" +
-                            "Проверьте:\n" +
-                            "1. Сервер запущен на ПК\n" +
-                            "2. Устройства в одной сети\n" +
-                            "3. Фаервол не блокирует порты 8765 и 8766"
-                    button.isEnabled = true
+                    text.text = "❌ $error"
+                    button.enable()
                     button.text = "Найти снова"
                     menuButton.disable()
                     keyboardButton.disable()
@@ -559,14 +555,6 @@ class MainActivity : AppCompatActivity() {
 //                    }
 
                     override fun onClosing(code: Int, reason: String?) {
-                        Log.d(TAG, "Соединение закрыто: $reason")
-                        runOnUiThread {
-                            text.text = "Соединение закрыто"
-                            button.text = "Подключиться"
-                            button.isEnabled = true
-                            menuButton.disable()
-                            keyboardButton.disable()
-                        }
                     }
 
                     override fun onFailure(t: Throwable) {
