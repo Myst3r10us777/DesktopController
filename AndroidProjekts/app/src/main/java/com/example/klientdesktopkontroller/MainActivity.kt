@@ -429,12 +429,8 @@ class MainActivity : AppCompatActivity() {
             onError = { error ->
                 Log.e(TAG, "Ошибка поиска: $error")
                 runOnUiThread {
-                    text.text = "❌ $error\n\n" +
-                            "Проверьте:\n" +
-                            "1. Сервер запущен на ПК\n" +
-                            "2. Устройства в одной сети\n" +
-                            "3. Фаервол не блокирует порты 8765 и 8766"
-                    button.isEnabled = true
+                    text.text = "❌ $error"
+                    button.enable()
                     button.text = "Найти снова"
                     menuButton.disable()
                     keyboardButton.disable()
