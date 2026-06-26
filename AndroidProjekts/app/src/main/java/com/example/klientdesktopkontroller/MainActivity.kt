@@ -503,6 +503,7 @@ class MainActivity : AppCompatActivity() {
         lastFrameTime = System.currentTimeMillis()
         startFrameTimeoutChecker()
         currentMonitor = 1
+
         navigationView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
 
@@ -565,6 +566,9 @@ class MainActivity : AppCompatActivity() {
                             button.isEnabled = true
                             menuButton.disable()
                             keyboardButton.disable()
+                            backspaceButton.disable()
+                            keyboardInputField.visibility = View.GONE
+                            keyboardInputField.setText("")
                         }
                     }
                 })
@@ -712,9 +716,12 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     menuButton.disable()
                     keyboardButton.disable()
+                    backspaceButton.disable()
                     text.text = "Вы оключились"
                     imageView.visibility = ImageView.GONE
                     button.enable()
+                    keyboardInputField.visibility = View.GONE
+                    keyboardInputField.setText("")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при отключении", e)
@@ -724,7 +731,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-
         disconnectFromWebSocket()
         websocketJob?.cancel()
         discoveryJob?.cancel()
