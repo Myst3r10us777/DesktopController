@@ -104,10 +104,10 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\Myster1ous\.gradle
 		ADDED from C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:8:9-65
 activity#com.example.klientdesktopkontroller.MainActivity
 ADDED from C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:15:9-24:20
-	android:screenOrientation
-		ADDED from C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:18:13-50
 	android:exported
 		ADDED from C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:17:13-36
+	android:configChanges
+		ADDED from C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:18:13-74
 	android:name
 		ADDED from C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:16:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER

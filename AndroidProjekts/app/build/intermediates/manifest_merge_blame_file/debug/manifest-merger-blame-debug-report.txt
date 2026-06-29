@@ -53,10 +53,10 @@
 33-->C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:15:9-24:20
 34            android:name="com.example.klientdesktopkontroller.MainActivity"
 34-->C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:16:13-41
-35            android:exported="true"
-35-->C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:17:13-36
-36            android:screenOrientation="landscape" >
-36-->C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:18:13-50
+35            android:configChanges="keyboardHidden|orientation|screenSize"
+35-->C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:18:13-74
+36            android:exported="true" >
+36-->C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:17:13-36
 37            <intent-filter>
 37-->C:\Practika\DesktopController\AndroidProjekts\app\src\main\AndroidManifest.xml:19:13-23:29
 38                <action android:name="android.intent.action.MAIN" />

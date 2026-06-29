@@ -34,7 +34,7 @@ class WebSocketClient(
             }
 
             send(json.toString())
-            Log.d(TAG, "🖱️ Отправлен абсолютный клик: $action ($type) at $absoluteX,$absoluteY")
+            Log.d(TAG, "Отправлен абсолютный клик: $action ($type) at $absoluteX,$absoluteY")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Ошибка отправки клика", e)
         }
@@ -82,14 +82,6 @@ class WebSocketClient(
     override fun onMessage(message: String?) {
         message?.let { listener.onMessage(it) }
     }
-
-//    override fun onMessage(message: ByteBuffer?) {
-//        message?.let { buffer ->
-//            val bytes = ByteArray(buffer.remaining())
-//            buffer.get(bytes)
-//            listener.onBinaryMessage(bytes)
-//        }
-//    }
 
     override fun onClose(code: Int, reason: String?, remote: Boolean) {
         listener.onClosing(code, reason)

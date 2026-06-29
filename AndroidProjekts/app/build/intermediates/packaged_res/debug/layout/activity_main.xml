@@ -19,7 +19,7 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:background="#000000"
-            android:contentDescription="Images"
+            android:contentDescription="@string/images"
             android:scaleType="matrix"
             android:visibility="invisible"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -29,48 +29,24 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_bias="0.0" />
 
-        <EditText
-            android:id="@+id/TextKeyBoard"
-            android:layout_width="649dp"
-            android:layout_height="47dp"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginBottom="56dp"
-            android:background="@drawable/rounded_corners"
-            android:cursorVisible="true"
-            android:hint="Печатайте!"
-            android:visibility="invisible"
-            android:inputType="text"
-            android:padding="5dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#FFFFFF"
-            android:textSize="18sp"
-            app:layout_constraintBottom_toBottomOf="@+id/imageView"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.498"
-            app:layout_constraintStart_toStartOf="parent" />
-
         <Button
             android:id="@+id/menuButton"
-            android:layout_width="75dp"
-            android:layout_height="30dp"
+            android:layout_width="74dp"
+            android:layout_height="47dp"
             android:layout_margin="16dp"
             android:alpha="0.4"
-            android:background="@drawable/rounded_corners"
-            android:rotation="-90"
-            android:text="Menu"
+            android:text="@string/menu"
             android:textSize="9sp"
             android:visibility="invisible"
-            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.115" />
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/text"
-            android:layout_width="269dp"
-            android:layout_height="52dp"
+            android:layout_width="289dp"
+            android:layout_height="50dp"
             android:lineSpacingMultiplier="1.2"
-            android:text="Нажмите для подключения"
+            android:text="@string/press_connect"
             android:textAlignment="center"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
@@ -78,53 +54,74 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="@+id/imageView"
-            app:layout_constraintVertical_bias="0.54" />
+            app:layout_constraintVertical_bias="0.422" />
 
         <Button
             android:id="@+id/button"
             android:layout_width="169dp"
             android:layout_height="46dp"
-            android:text="Подключиться"
+            android:text="@string/connect"
             android:textSize="16sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/imageView"
-            app:layout_constraintVertical_bias="0.597" />
+            app:layout_constraintTop_toBottomOf="@+id/text"
+            app:layout_constraintVertical_bias="0.0" />
+
 
         <Button
             android:id="@+id/Keyboard"
             android:layout_width="61dp"
             android:layout_height="42dp"
             android:layout_margin="16dp"
+            android:layout_marginEnd="8dp"
             android:alpha="0.4"
-            android:text="⌨️"
+            android:text="@string/keyboard_pin"
             android:textSize="15sp"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toTopOf="@+id/TextKeyBoard"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.961" />
+
+        <EditText
+            android:id="@+id/TextKeyBoard"
+            android:layout_width="0dp"
+            android:layout_height="43dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/rounded_corners"
+            android:cursorVisible="true"
+            android:hint="@string/input"
+            android:inputType="text"
+            android:padding="5dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#FFFFFF"
+            android:textSize="18sp"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/btn_backspace"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_backspace"
+            android:layout_width="46dp"
+            android:layout_height="43dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/backspace_btn"
+            android:text="@string/x"
             android:visibility="invisible"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="1.0" />
+            app:layout_constraintStart_toEndOf="@+id/TextKeyBoard" />
 
         <androidx.constraintlayout.widget.Group
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             app:constraint_referenced_ids="button,text" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btn_backspace"
-            android:layout_width="48dp"
-            android:layout_height="46dp"
-            android:visibility="invisible"
-            android:text="X"
-            android:background="@drawable/backspace_btn"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="@+id/imageView"
-            app:layout_constraintHorizontal_bias="0.0"
-            app:layout_constraintStart_toEndOf="@+id/TextKeyBoard"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.86"
-            tools:ignore="MissingConstraints" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

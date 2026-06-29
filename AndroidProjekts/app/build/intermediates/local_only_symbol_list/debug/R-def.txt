@@ -26,6 +26,13 @@ mipmap ic_launcher
 mipmap ic_launcher_foreground
 mipmap ic_launcher_round
 string app_name
+string connect
+string images
+string input
+string keyboard_pin
+string menu
+string press_connect
+string x
 style Base.Theme.KlientDesktopKontroller
 style Theme.KlientDesktopKontroller
 xml backup_rules

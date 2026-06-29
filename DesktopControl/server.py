@@ -59,7 +59,6 @@ class DiscoveryServer:
                             "ip": self.server_ip,
                             "port": 8765,
                             "name": socket.gethostname(),
-                            "version": "1.0"
                         }
 
                         response_data = json.dumps(response).encode('utf-8')
@@ -331,7 +330,7 @@ class ScreenStreamer:
                     if sct is None:
                         import mss
                         sct = mss.mss()
-                        print(f"✅ MSS инициализирован (поток: {threading.current_thread().name})")
+                        print(f"MSS инициализирован (поток: {threading.current_thread().name})")
                     
                     monitor = sct.monitors[self.current_monitor]
                     screenshot = sct.grab(monitor)
@@ -378,10 +377,10 @@ class ScreenStreamer:
             try:
                 if sct:
                     sct.close()
-                    print("🔌 MSS закрыт")
+                    print("MSS закрыт")
             except:
                 pass
-            print("⏹️ Поток стриминга завершен")
+            print("Поток стриминга завершен")
 
 class StreamerApp:
     def __init__(self):

@@ -27,7 +27,7 @@ class NetworkDiscovery {
         attempts: Int = 3
     ) {
         if (isRunning) {
-            Log.w(TAG, "⚠️ Поиск уже выполняется")
+            Log.w(TAG, "Поиск уже выполняется")
             return
         }
 
@@ -142,7 +142,7 @@ class NetworkDiscovery {
     }
 
     fun stopDiscovery() {
-        Log.d(TAG, "⏹️ Остановка discovery")
+        Log.d(TAG, "Остановка discovery")
         isRunning = false
         discoveryThread?.interrupt()
         discoveryThread = null
