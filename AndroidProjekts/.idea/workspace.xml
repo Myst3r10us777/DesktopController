@@ -29,24 +29,21 @@
   <component name="ChangeListManager">
     <list default="true" id="d1560c4d-4def-443e-8422-9fcb3cee9abe" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/outputFiles.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/outputFiles.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.gradle/file-system.probe" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/file-system.probe" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/R.jar" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/intermediates/compile_and_runtime_not_namespaced_r_class_jar/debug/R.jar" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/mergeDebugResources/compile-file-map.properties" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/mergeDebugResources/compile-file-map.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/mergeDebugResources/merger.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/mergeDebugResources/merger.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/packageDebugResources/compile-file-map.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/packageDebugResources/merger.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/intermediates/incremental/debug/packageDebugResources/merger.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/intermediates/runtime_symbol_list/debug/R.txt" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/intermediates/runtime_symbol_list/debug/R.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/intermediates/symbol_list_with_package_name/debug/package-aware-r.txt" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/intermediates/symbol_list_with_package_name/debug/package-aware-r.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$connectToWebSocket$2$1.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$connectToWebSocket$2$1.class" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$connectToWebSocket$2.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$connectToWebSocket$2.class" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$disconnectFromWebSocket$1.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$disconnectFromWebSocket$1.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$handleWebSocketMessage$1$2$1.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$handleWebSocketMessage$1$3.class" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$handleWebSocketMessage$1.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$handleWebSocketMessage$1.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$setupGestureDetector$1.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$setupGestureDetector$1.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$startAutoDiscovery$1.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$startAutoDiscovery$1.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$startAutoDiscovery$2.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity$startAutoDiscovery$2.class" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/MainActivity.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/NetworkDiscovery.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/NetworkDiscovery.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/WebSocketClient$Listener.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/WebSocketClient$Listener.class" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/WebSocketClient.class" beforeDir="false" afterPath="$PROJECT_DIR$/app/build/tmp/kotlin-classes/debug/com/example/klientdesktopkontroller/WebSocketClient.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/klientdesktopkontroller/NetworkDiscovery.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/klientdesktopkontroller/NetworkDiscovery.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/klientdesktopkontroller/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/klientdesktopkontroller/MainActivity.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/klientdesktopkontroller/WebSocketClient.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/klientdesktopkontroller/WebSocketClient.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -57,7 +54,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=C:\Users\Myster1ous\.android\avd\Pixel_9_Pro_XL.avd)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=UOPZ6XEM95Y9XGP7)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />

@@ -340,13 +340,9 @@ class ScreenStreamer:
                         cv2.IMWRITE_JPEG_QUALITY, 70
                     ])
                     
-                    message = json.dumps({
-                        "type": "frame",
-                        "data": base64.b64encode(buffer).decode('utf-8')
-                    })
                     
                     try:
-                        await websocket.send(message)
+                        await websocket.send(buffer.tobytes())
                         consecutive_errors = 0
                     except Exception as e:
                         print(f"❌ Ошибка отправки кадра: {e}")

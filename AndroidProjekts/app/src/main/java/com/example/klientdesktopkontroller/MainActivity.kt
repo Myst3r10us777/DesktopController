@@ -276,6 +276,7 @@ class MainActivity : AppCompatActivity() {
 
             absoluteCoords?.let { (absX, absY) ->
                 websocketClient?.sendClick(absX, absY, 0, "down", "click")
+                websocketClient?.sendClick(absX, absY, 0, "up", "click")
                 Log.d(TAG, "Клик: ($absX, $absY)")
             }
         }
@@ -448,23 +449,23 @@ class MainActivity : AppCompatActivity() {
                 val type = jsonObject.getString("type")
 
                 when (type) {
-                    "frame" -> {
-                        lastFrameTime = System.currentTimeMillis()
-                        runOnUiThread {
-                            menuButton.isEnabled = true
-                            menuButton.visibility = View.VISIBLE
-                        }
-                        val frameData = jsonObject.getString("data")
-                        val bitmap = decodeBase64ToBitmap(frameData)
-
-                        bitmap?.let {
-                            withContext(Dispatchers.Main) {
-                                imageView.setImageBitmap(it)
-                                imageView.visibility = ImageView.VISIBLE
-                                applyImageTransform()
-                            }
-                        }
-                    }
+//                    "frame" -> {
+//                        lastFrameTime = System.currentTimeMillis()
+//                        runOnUiThread {
+//                            menuButton.isEnabled = true
+//                            menuButton.visibility = View.VISIBLE
+//                        }
+//                        val frameData = jsonObject.getString("data")
+//                        val bitmap = decodeBase64ToBitmap(frameData)
+//
+//                        bitmap?.let {
+//                            withContext(Dispatchers.Main) {
+//                                imageView.setImageBitmap(it)
+//                                imageView.visibility = ImageView.VISIBLE
+//                                applyImageTransform()
+//                            }
+//                        }
+//                    }
                     "monitors_info" -> {
                         val monitorsCount = jsonObject.getInt("monitors_count")
                         val monitorsArray = jsonObject.getJSONArray("monitors")
@@ -535,25 +536,25 @@ class MainActivity : AppCompatActivity() {
                         handleWebSocketMessage(message)
                     }
 
-//                    override fun onBinaryMessage(data: ByteArray) {
-//                        lastFrameTime = System.currentTimeMillis()
-//                        runOnUiThread {
+                    override fun onBinaryMessage(data: ByteArray) {
+                        lastFrameTime = System.currentTimeMillis()
+                        runOnUiThread {
 //                            text.text = ""
 //                            text.visibility = View.GONE
-//                            button.disable()
-//                            menuButton.enable()
-//                            keyboardButton.enable()
-//                        }
-//                        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
-//
-//                        bitmap?.let {
-//                            runOnUiThread {
-//                                imageView.setImageBitmap(it)
-//                                imageView.visibility = ImageView.VISIBLE
-//                                applyImageTransform()
-//                            }
-//                        }
-//                    }
+                            button.disable()
+                            menuButton.enable()
+                            keyboardButton.enable()
+                        }
+                        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+
+                        bitmap?.let {
+                            runOnUiThread {
+                                imageView.setImageBitmap(it)
+                                imageView.visibility = ImageView.VISIBLE
+                                applyImageTransform()
+                            }
+                        }
+                    }
 
                     override fun onClosing(code: Int, reason: String?) {
                     }
@@ -692,16 +693,16 @@ class MainActivity : AppCompatActivity() {
 
         return Pair(normalizedX, normalizedY)
     }
-    private fun decodeBase64ToBitmap(base64String: String): Bitmap? {
-        return try {
-            val pureBase64 = base64String.substringAfterLast(",")
-            val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка декодирования base64", e)
-            null
-        }
-    }
+//    private fun decodeBase64ToBitmap(base64String: String): Bitmap? {
+//        return try {
+//            val pureBase64 = base64String.substringAfterLast(",")
+//            val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
+//            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+//        } catch (e: Exception) {
+//            Log.e(TAG, "Ошибка декодирования base64", e)
+//            null
+//        }
+//    }
 
     private fun disconnectFromWebSocket() {
         CoroutineScope(Dispatchers.IO).launch {
