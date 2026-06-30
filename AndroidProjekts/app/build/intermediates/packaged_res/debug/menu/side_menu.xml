@@ -13,12 +13,6 @@
             android:title="Рабочий стол 3" />
     </group>
 
-<!--    <group android:checkableBehavior="none">-->
-<!--        <item-->
-<!--            android:id="@+id/Keyboard"-->
-<!--            android:title="Клавиатура" />-->
-<!--    </group>-->
-
     <group android:checkableBehavior="none">
         <item
             android:id="@+id/menu_disconnect"

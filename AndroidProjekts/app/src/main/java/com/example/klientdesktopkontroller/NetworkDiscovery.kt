@@ -27,7 +27,7 @@ class NetworkDiscovery {
         attempts: Int = 3
     ) {
         if (isRunning) {
-            Log.w(TAG, "⚠️ Поиск уже выполняется")
+            Log.w(TAG, "Поиск уже выполняется")
             return
         }
 
@@ -35,14 +35,12 @@ class NetworkDiscovery {
 
         discoveryThread = Thread {
             try {
-                // 1. Создаем UDP сокет
                 socket = DatagramSocket()
                 socket?.soTimeout = TIMEOUT_MS
                 socket?.broadcast = true
 
                 Log.d(TAG, "Начинаем поиск сервера в сети...")
 
-                // 2. Формируем broadcast сообщение
                 val messageBytes = DISCOVERY_MESSAGE.toByteArray()
                 val broadcastAddress = InetAddress.getByName("255.255.255.255")
                 val packet = DatagramPacket(
@@ -54,7 +52,6 @@ class NetworkDiscovery {
 
                 var serverFound = false
 
-                // 3. Отправляем несколько раз (на случай потери пакетов)
                 for (attempt in 1..attempts) {
                     if (!isRunning) break
 
@@ -67,7 +64,6 @@ class NetworkDiscovery {
                         continue
                     }
 
-                    // 4. Ждем ответ
                     val waitStartTime = System.currentTimeMillis()
                     val waitDuration = (timeoutSeconds * 1000L) / attempts
 
@@ -75,12 +71,10 @@ class NetworkDiscovery {
                         if (!isRunning) break
 
                         try {
-                            // Пытаемся получить ответ
                             val receiveBuffer = ByteArray(BUFFER_SIZE)
                             val receivePacket = DatagramPacket(receiveBuffer, receiveBuffer.size)
                             socket?.receive(receivePacket)
 
-                            // 5. Разбираем ответ
                             val responseData = String(
                                 receivePacket.data,
                                 0,
@@ -91,7 +85,6 @@ class NetworkDiscovery {
 
                             val json = JSONObject(responseData)
 
-                            // Проверяем, что это наш сервер
                             if (json.getString("type") == "discovery_response") {
                                 val ip = json.getString("ip")
                                 val port = json.getInt("port")
@@ -102,7 +95,6 @@ class NetworkDiscovery {
                                 serverFound = true
                                 isRunning = false
 
-                                // Вызываем колбэк в UI потоке
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                                     onServerFound(ip, port, name)
                                 }
@@ -112,7 +104,6 @@ class NetworkDiscovery {
                             }
 
                         } catch (e: SocketTimeoutException) {
-                            // Таймаут - продолжаем ждать или следующую попытку
                             Log.d(TAG, "Таймаут ожидания ответа")
                             break
                         } catch (e: Exception) {
@@ -121,13 +112,12 @@ class NetworkDiscovery {
                     }
                 }
 
-                // 6. Если сервер не найден
                 if (!serverFound && isRunning) {
                     isRunning = false
                     Log.d(TAG, "❌ Сервер не найден за отведенное время")
 
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        onError("Сервер не найден в сети.\nПроверьте, что сервер запущен и устройства в одной сети.")
+                        onError("Сервер не найден в сети.")
                     }
                 }
 
@@ -142,7 +132,6 @@ class NetworkDiscovery {
                 try {
                     socket?.close()
                 } catch (e: Exception) {
-                    // Игнорируем ошибки закрытия
                 }
                 isRunning = false
                 Log.d(TAG, "🔌 Discovery завершен")
@@ -153,14 +142,13 @@ class NetworkDiscovery {
     }
 
     fun stopDiscovery() {
-        Log.d(TAG, "⏹️ Остановка discovery")
+        Log.d(TAG, "Остановка discovery")
         isRunning = false
         discoveryThread?.interrupt()
         discoveryThread = null
         try {
             socket?.close()
         } catch (e: Exception) {
-            // Игнорируем
         }
     }
 }

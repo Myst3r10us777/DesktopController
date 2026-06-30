@@ -32,6 +32,7 @@
         android:theme="@style/Theme.KlientDesktopKontroller" >
         <activity
             android:name="com.example.klientdesktopkontroller.MainActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
             android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

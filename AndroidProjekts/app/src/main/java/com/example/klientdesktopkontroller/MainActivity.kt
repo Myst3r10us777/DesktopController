@@ -33,6 +33,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.core.view.isVisible
 import androidx.drawerlayout.widget.DrawerLayout
 import com.example.klientdesktopkontroller.WebSocketClient
 import com.google.android.material.navigation.NavigationView
@@ -55,8 +56,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var button: Button
 
     private lateinit var menuButton: Button
-
     private lateinit var keyboardButton: Button
+    private lateinit var backspaceButton: Button
     private lateinit var text: TextView
     private lateinit var imageView: ImageView
 
@@ -108,7 +109,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     //определение кнопок и т.п
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -121,6 +121,7 @@ class MainActivity : AppCompatActivity() {
         keyboardInputField = findViewById(R.id.TextKeyBoard)
         menuButton = findViewById<Button>(R.id.menuButton)
         keyboardButton = findViewById<Button>(R.id.Keyboard)
+        backspaceButton = findViewById<Button>(R.id.btn_backspace)
         menuButton.disable()
         keyboardButton.disable()
         menuButton.setOnClickListener {
@@ -133,6 +134,10 @@ class MainActivity : AppCompatActivity() {
 
         keyboardButton.setOnClickListener {
             Keyboard()
+        }
+
+        backspaceButton.setOnClickListener {
+            sendBackspace()
         }
 
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
@@ -167,9 +172,11 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             if (keyboardInputField.visibility == View.VISIBLE){
                 keyboardInputField.visibility = View.GONE
+                backspaceButton.disable()
                 return@runOnUiThread
             }
             keyboardInputField.visibility = View.VISIBLE
+            backspaceButton.enable()
             keyboardInputField.setText("")
             keyboardInputField.requestFocus()
 
@@ -184,6 +191,7 @@ class MainActivity : AppCompatActivity() {
 
                     keyboardInputField.visibility = View.GONE
                     keyboardInputField.setText("")
+                    backspaceButton.disable()
                     true
                 } else {
                     false
@@ -207,7 +215,6 @@ class MainActivity : AppCompatActivity() {
         val text = keyboardInputField.text.toString().trim()
         if (text.isNotEmpty()) {
             try {
-
                 websocketClient?.sendText(text)
                 Log.d(TAG, "Текст отправлен: $text")
 
@@ -215,7 +222,18 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Ошибка отправки текста", e)
             }
         }
+    }
 
+    private fun sendBackspace(){
+        runOnUiThread {
+            try {
+                websocketClient?.sendBackspace()
+                Log.d(TAG, "Backspace нажат")
+            } catch (e: Exception){
+                Log.e(TAG, "Ошибка нажатия backspace", e)
+            }
+
+        }
     }
 
     private fun setupTouchListener() {
@@ -258,6 +276,7 @@ class MainActivity : AppCompatActivity() {
 
             absoluteCoords?.let { (absX, absY) ->
                 websocketClient?.sendClick(absX, absY, 0, "down", "click")
+                websocketClient?.sendClick(absX, absY, 0, "up", "click")
                 Log.d(TAG, "Клик: ($absX, $absY)")
             }
         }
@@ -401,21 +420,18 @@ class MainActivity : AppCompatActivity() {
             onServerFound = { ip, port, name ->
                 Log.d(TAG, "Сервер найден: $name @ $ip:$port")
                 runOnUiThread {
-                    text.text = "Найден сервер: $name\nПодключение..."
                     connectToWebSocket(URI("ws://$ip:$port"))
                     menuButton.enable()
                     keyboardButton.enable()
+                    button.disable()
+                    text.text = ""
                 }
             },
             onError = { error ->
                 Log.e(TAG, "Ошибка поиска: $error")
                 runOnUiThread {
-                    text.text = "❌ $error\n\n" +
-                            "Проверьте:\n" +
-                            "1. Сервер запущен на ПК\n" +
-                            "2. Устройства в одной сети\n" +
-                            "3. Фаервол не блокирует порты 8765 и 8766"
-                    button.isEnabled = true
+                    text.text = "❌ $error"
+                    button.enable()
                     button.text = "Найти снова"
                     menuButton.disable()
                     keyboardButton.disable()
@@ -433,23 +449,23 @@ class MainActivity : AppCompatActivity() {
                 val type = jsonObject.getString("type")
 
                 when (type) {
-                    "frame" -> {
-                        lastFrameTime = System.currentTimeMillis()
-                        runOnUiThread {
-                            menuButton.isEnabled = true
-                            menuButton.visibility = View.VISIBLE
-                        }
-                        val frameData = jsonObject.getString("data")
-                        val bitmap = decodeBase64ToBitmap(frameData)
-
-                        bitmap?.let {
-                            withContext(Dispatchers.Main) {
-                                imageView.setImageBitmap(it)
-                                imageView.visibility = ImageView.VISIBLE
-                                applyImageTransform()
-                            }
-                        }
-                    }
+//                    "frame" -> {
+//                        lastFrameTime = System.currentTimeMillis()
+//                        runOnUiThread {
+//                            menuButton.isEnabled = true
+//                            menuButton.visibility = View.VISIBLE
+//                        }
+//                        val frameData = jsonObject.getString("data")
+//                        val bitmap = decodeBase64ToBitmap(frameData)
+//
+//                        bitmap?.let {
+//                            withContext(Dispatchers.Main) {
+//                                imageView.setImageBitmap(it)
+//                                imageView.visibility = ImageView.VISIBLE
+//                                applyImageTransform()
+//                            }
+//                        }
+//                    }
                     "monitors_info" -> {
                         val monitorsCount = jsonObject.getInt("monitors_count")
                         val monitorsArray = jsonObject.getJSONArray("monitors")
@@ -488,6 +504,7 @@ class MainActivity : AppCompatActivity() {
         lastFrameTime = System.currentTimeMillis()
         startFrameTimeoutChecker()
         currentMonitor = 1
+
         navigationView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
 
@@ -519,35 +536,27 @@ class MainActivity : AppCompatActivity() {
                         handleWebSocketMessage(message)
                     }
 
-//                    override fun onBinaryMessage(data: ByteArray) {
-//                        lastFrameTime = System.currentTimeMillis()
-//                        runOnUiThread {
+                    override fun onBinaryMessage(data: ByteArray) {
+                        lastFrameTime = System.currentTimeMillis()
+                        runOnUiThread {
 //                            text.text = ""
 //                            text.visibility = View.GONE
-//                            button.disable()
-//                            menuButton.enable()
-//                            keyboardButton.enable()
-//                        }
-//                        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
-//
-//                        bitmap?.let {
-//                            runOnUiThread {
-//                                imageView.setImageBitmap(it)
-//                                imageView.visibility = ImageView.VISIBLE
-//                                applyImageTransform()
-//                            }
-//                        }
-//                    }
+                            button.disable()
+                            menuButton.enable()
+                            keyboardButton.enable()
+                        }
+                        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+
+                        bitmap?.let {
+                            runOnUiThread {
+                                imageView.setImageBitmap(it)
+                                imageView.visibility = ImageView.VISIBLE
+                                applyImageTransform()
+                            }
+                        }
+                    }
 
                     override fun onClosing(code: Int, reason: String?) {
-                        Log.d(TAG, "Соединение закрыто: $reason")
-                        runOnUiThread {
-                            text.text = "📞 Соединение закрыто"
-                            button.text = "Подключиться"
-                            button.isEnabled = true
-                            menuButton.disable()
-                            keyboardButton.disable()
-                        }
                     }
 
                     override fun onFailure(t: Throwable) {
@@ -558,6 +567,9 @@ class MainActivity : AppCompatActivity() {
                             button.isEnabled = true
                             menuButton.disable()
                             keyboardButton.disable()
+                            backspaceButton.disable()
+                            keyboardInputField.visibility = View.GONE
+                            keyboardInputField.setText("")
                         }
                     }
                 })
@@ -565,14 +577,6 @@ class MainActivity : AppCompatActivity() {
                 websocketClient?.connect()
 
                 delay(2000)
-
-                if (websocketClient?.isOpen == true) {
-                    runOnUiThread {
-                        text.text = "✅ Подключено!\n🎥 Трансляция началась..."
-                        button.text = "Отключиться"
-                        button.isEnabled = true
-                    }
-                }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при подключении", e)
@@ -597,10 +601,9 @@ class MainActivity : AppCompatActivity() {
             imageView.setImageBitmap(null)
             imageView.visibility = View.GONE
 
-            text.text = "Связь с сервером потеряна. Пытаемся повторно подключиться"
-            button.isEnabled = false
-            menuButton.isEnabled = false
-            menuButton.visibility = View.GONE
+            text.text = "Связь с сервером потеряна. Повторное подключение..."
+            button.disable()
+            menuButton.disable()
 
             scaleFactor = 1.0f
             posX = 0f
@@ -690,16 +693,16 @@ class MainActivity : AppCompatActivity() {
 
         return Pair(normalizedX, normalizedY)
     }
-    private fun decodeBase64ToBitmap(base64String: String): Bitmap? {
-        return try {
-            val pureBase64 = base64String.substringAfterLast(",")
-            val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка декодирования base64", e)
-            null
-        }
-    }
+//    private fun decodeBase64ToBitmap(base64String: String): Bitmap? {
+//        return try {
+//            val pureBase64 = base64String.substringAfterLast(",")
+//            val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
+//            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+//        } catch (e: Exception) {
+//            Log.e(TAG, "Ошибка декодирования base64", e)
+//            null
+//        }
+//    }
 
     private fun disconnectFromWebSocket() {
         CoroutineScope(Dispatchers.IO).launch {
@@ -714,10 +717,12 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     menuButton.disable()
                     keyboardButton.disable()
+                    backspaceButton.disable()
                     text.text = "Вы оключились"
                     imageView.visibility = ImageView.GONE
-                    button.isEnabled = true
-                    button.text = "Подключиться"
+                    button.enable()
+                    keyboardInputField.visibility = View.GONE
+                    keyboardInputField.setText("")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при отключении", e)
@@ -727,7 +732,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-
         disconnectFromWebSocket()
         websocketJob?.cancel()
         discoveryJob?.cancel()
