@@ -13,6 +13,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.util.Base64
 import android.util.Log
+import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -28,10 +29,13 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
+import androidx.core.view.isVisible
 import androidx.drawerlayout.widget.DrawerLayout
+import com.example.klientdesktopkontroller.WebSocketClient
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +48,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.milliseconds
 import com.example.klientdesktopkontroller.WebSocketClient as MyWebSocketClient
 
 class MainActivity : AppCompatActivity() {
@@ -51,6 +56,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var button: Button
 
     private lateinit var menuButton: Button
+    private lateinit var keyboardButton: Button
+    private lateinit var backspaceButton: Button
     private lateinit var text: TextView
     private lateinit var imageView: ImageView
 
@@ -62,33 +69,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navigationView: NavigationView
 
     private lateinit var scaleGestureDetector: ScaleGestureDetector
+
+    private lateinit var gestureDetector: GestureDetector
     private var scaleFactor = 1.0f
-    private var lastTouchX = 0f
-    private var lastTouchY = 0f
     private var posX = 0f
     private var posY = 0f
-    private var isDragging = false
-
     private lateinit var keyboardInputField: EditText
 
-    private var longPressRunnable: Runnable? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private val LONG_PRESS_DELAY = 1000L
-    private var isLongPressTriggered = false
-
-    private var lastTapTime = 0L
-    private val DOUBLE_TAP_DELAY = 300L
-
-    private var dClick = false
     private var lastFrameTime = 0L
     private val frameTimeout = 3000L
     private val frameTimeoutCheckInterval = 500L
     private var frameTimeoutJob: Job? = null
-
     private val matrix = Matrix()
-
-    private var scrollThreshold = 20f
-    private var lastScrollY = 0f
 
     private var currentMonitor = 1
     private var monitorsInfo: List<MonitorInfo> = listOf()
@@ -104,7 +96,16 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "ScreenViewer"
-        private val COMMON_IPS = listOf("")
+    }
+
+    fun View.enable() {
+        isEnabled = true
+        visibility = View.VISIBLE
+    }
+
+    fun View.disable() {
+        isEnabled = false
+        visibility = View.GONE
     }
 
     //определение кнопок и т.п
@@ -119,7 +120,10 @@ class MainActivity : AppCompatActivity() {
         navigationView = findViewById(R.id.navigationView)
         keyboardInputField = findViewById(R.id.TextKeyBoard)
         menuButton = findViewById<Button>(R.id.menuButton)
-        menuButton.isEnabled = false
+        keyboardButton = findViewById<Button>(R.id.Keyboard)
+        backspaceButton = findViewById<Button>(R.id.btn_backspace)
+        menuButton.disable()
+        keyboardButton.disable()
         menuButton.setOnClickListener {
             if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
                 drawerLayout.closeDrawer(GravityCompat.START)
@@ -128,11 +132,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        keyboardButton.setOnClickListener {
+            Keyboard()
+        }
+
+        backspaceButton.setOnClickListener {
+            sendBackspace()
+        }
+
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
         button.setOnClickListener {
             startAutoDiscovery()
         }
         setupZoomGestures()
+        setupGestureDetector()
         setupTouchListener()
         startFrameTimeoutChecker()
     }
@@ -142,7 +155,7 @@ class MainActivity : AppCompatActivity() {
         frameTimeoutJob?.cancel()
         frameTimeoutJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
-                delay(frameTimeoutCheckInterval)
+                delay(frameTimeoutCheckInterval.milliseconds)
 
                 val currentTime = System.currentTimeMillis()
                 val timeSinceLastFrame = currentTime - lastFrameTime
@@ -157,7 +170,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun Keyboard() {
         runOnUiThread {
+            if (keyboardInputField.visibility == View.VISIBLE){
+                keyboardInputField.visibility = View.GONE
+                backspaceButton.disable()
+                return@runOnUiThread
+            }
             keyboardInputField.visibility = View.VISIBLE
+            backspaceButton.enable()
             keyboardInputField.setText("")
             keyboardInputField.requestFocus()
 
@@ -172,6 +191,7 @@ class MainActivity : AppCompatActivity() {
 
                     keyboardInputField.visibility = View.GONE
                     keyboardInputField.setText("")
+                    backspaceButton.disable()
                     true
                 } else {
                     false
@@ -195,7 +215,6 @@ class MainActivity : AppCompatActivity() {
         val text = keyboardInputField.text.toString().trim()
         if (text.isNotEmpty()) {
             try {
-
                 websocketClient?.sendText(text)
                 Log.d(TAG, "Текст отправлен: $text")
 
@@ -203,12 +222,24 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Ошибка отправки текста", e)
             }
         }
+    }
 
+    private fun sendBackspace(){
+        runOnUiThread {
+            try {
+                websocketClient?.sendBackspace()
+                Log.d(TAG, "Backspace нажат")
+            } catch (e: Exception){
+                Log.e(TAG, "Ошибка нажатия backspace", e)
+            }
+
+        }
     }
 
     private fun setupTouchListener() {
         imageView.setOnTouchListener { _, event ->
-            onTouchEvent(event)
+            gestureDetector.onTouchEvent(event)
+            scaleGestureDetector.onTouchEvent(event)
             true
         }
     }
@@ -234,8 +265,98 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            scaleGestureDetector.isQuickScaleEnabled = false
+        scaleGestureDetector.isQuickScaleEnabled = false
+    }
+
+    private fun handleSingleTap(e: MotionEvent) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 0, "down", "click")
+                websocketClient?.sendClick(absX, absY, 0, "up", "click")
+                Log.d(TAG, "Клик: ($absX, $absY)")
+            }
+        }
+    }
+    private fun setupGestureDetector(){
+        gestureDetector = GestureDetector(this,
+            object : GestureDetector.SimpleOnGestureListener() {
+
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    handleSingleTap(e)
+                    return true
+                }
+
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    handleDoubleTap(e)
+                    return true
+                }
+
+                override fun onLongPress(e: MotionEvent) {
+                    handleLongPress(e)
+                }
+
+                override fun onScroll(
+                    e1: MotionEvent?,
+                    e2: MotionEvent,
+                    distanceX: Float,
+                    distanceY: Float
+                ): Boolean {
+                    if (scaleFactor > 1.0f) {
+                        posX -= distanceX
+                        posY -= distanceY
+                        applyImageTransform()
+                        return true
+                    }
+
+                    handleScroll(e2, distanceY)
+                    return true
+                }
+            }
+        )
+    }
+
+    private fun handleDoubleTap(e: MotionEvent) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 0, "down", "click")
+                websocketClient?.sendClick(absX, absY, 0, "up", "click")
+                Log.d(TAG, "Двойной клик: ($absX, $absY)")
+            }
+        }
+    }
+
+    private fun handleLongPress(e: MotionEvent) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 1, "click", "click")
+                Log.d(TAG, "Правый клик (долгое нажатие): ($absX, $absY)")
+            }
+        }
+    }
+
+    private fun handleScroll(e: MotionEvent, distanceY: Float) {
+        val imageCoords = getImageCoordinates(e.x, e.y)
+        val scrollAmount = if (distanceY > 0) "up" else "down"
+
+        imageCoords?.let { (normalizedX, normalizedY) ->
+            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
+
+            absoluteCoords?.let { (absX, absY) ->
+                websocketClient?.sendClick(absX, absY, 0, scrollAmount, "wheel")
+                Log.d(TAG, "Скролл: $scrollAmount на ($absX, $absY)")
+            }
         }
     }
 
@@ -273,8 +394,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Для Android 11 и выше
-            window.setDecorFitsSystemWindows(false)
+            enableEdgeToEdge()
             val controller = window.insetsController
             controller?.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
             controller?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -288,120 +408,38 @@ class MainActivity : AppCompatActivity() {
 
     //подключение к серверу
     private fun startAutoDiscovery() {
+        text.text = "🔍 Поиск сервера..."
         button.isEnabled = false
         button.text = "Поиск..."
-        text.text = "🔍 Поиск сервера в сети..."
+        text.text = "Поиск сервера в сети..."
 
-        // Отменяем предыдущий поиск
         discovery?.stopDiscovery()
         discovery = NetworkDiscovery()
 
         discovery?.discoverServers(
             onServerFound = { ip, port, name ->
                 Log.d(TAG, "Сервер найден: $name @ $ip:$port")
-
                 runOnUiThread {
-                    text.text = "✅ Найден сервер: $name\nПодключение..."
                     connectToWebSocket(URI("ws://$ip:$port"))
-                    menuButton.isEnabled = true
-                    menuButton.visibility = View.VISIBLE
+                    menuButton.enable()
+                    keyboardButton.enable()
+                    button.disable()
+                    text.text = ""
                 }
             },
             onError = { error ->
                 Log.e(TAG, "Ошибка поиска: $error")
-
                 runOnUiThread {
-                    text.text = "❌ $error\n\n" +
-                            "Проверьте:\n" +
-                            "1. Сервер запущен на ПК\n" +
-                            "2. Устройства в одной сети\n" +
-                            "3. Фаервол не блокирует порты 8765 и 8766"
-                    button.isEnabled = true
+                    text.text = "❌ $error"
+                    button.enable()
                     button.text = "Найти снова"
-                    menuButton.isEnabled = false
-                    menuButton.visibility = View.GONE
+                    menuButton.disable()
+                    keyboardButton.disable()
                 }
             },
             timeoutSeconds = 5,
             attempts = 3
         )
-    }
-
-    private fun connectToWebSocket(uri: URI) {
-        lastFrameTime = System.currentTimeMillis()
-        startFrameTimeoutChecker()
-        currentMonitor = 1
-        navigationView.setNavigationItemSelectedListener { menuItem ->
-            when (menuItem.itemId) {
-
-                R.id.menu_desktop_1 -> {
-                    websocketClient?.switchDesktop(1)
-                    currentMonitor = 1
-                }
-                R.id.menu_desktop_2 -> {
-                    websocketClient?.switchDesktop(2)
-                    currentMonitor = 2
-                }
-                R.id.menu_desktop_3 -> {
-                    websocketClient?.switchDesktop(3)
-                    currentMonitor = 3
-                }
-                R.id.menu_disconnect -> disconnectFromWebSocket()
-                R.id.Keyboard -> Keyboard()
-            }
-            drawerLayout.closeDrawer(GravityCompat.START)
-            true
-        }
-
-        websocketJob = CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Log.d(TAG, "Подключаюсь к $uri...")
-
-                websocketClient = MyWebSocketClient(uri, object : MyWebSocketClient.Listener {
-                    override fun onMessage(message: String) {
-                        runOnUiThread {
-                            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                        }
-                        handleWebSocketMessage(message)
-                    }
-
-                    override fun onClosing(code: Int, reason: String?) {
-                        runOnUiThread {
-                            text.text = "❌ Ошибка подключения\n"
-                            button.text = "Подключиться"
-                            button.isEnabled = true
-                            menuButton.isEnabled = false
-                            menuButton.visibility = View.GONE
-                        }
-                    }
-
-                    override fun onFailure(t: Throwable) {
-                        Log.e(TAG, "Ошибка подключения", t)
-                        runOnUiThread {
-                            text.text = "❌ Ошибка подключения\n${t.message}"
-                            button.text = "Подключиться"
-                            button.isEnabled = true
-                            menuButton.isEnabled = false
-                            menuButton.visibility = View.GONE
-                        }
-                    }
-                })
-
-                websocketClient?.connect()
-
-                delay(2000)
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Ошибка при подключении", e)
-                runOnUiThread {
-                    text.text = "❌ Ошибка: ${e.message}"
-                    button.text = "Подключиться"
-                    button.isEnabled = true
-                    menuButton.isEnabled = false
-                    menuButton.visibility = View.GONE
-                }
-            }
-        }
     }
 
     private fun handleWebSocketMessage(message: String) {
@@ -411,23 +449,23 @@ class MainActivity : AppCompatActivity() {
                 val type = jsonObject.getString("type")
 
                 when (type) {
-                    "frame" -> {
-                        lastFrameTime = System.currentTimeMillis()
-                        runOnUiThread {
-                            menuButton.isEnabled = true
-                            menuButton.visibility = View.VISIBLE
-                        }
-                        val frameData = jsonObject.getString("data")
-                        val bitmap = decodeBase64ToBitmap(frameData)
-
-                        bitmap?.let {
-                            withContext(Dispatchers.Main) {
-                                imageView.setImageBitmap(it)
-                                imageView.visibility = ImageView.VISIBLE
-                                applyImageTransform()
-                            }
-                        }
-                    }
+//                    "frame" -> {
+//                        lastFrameTime = System.currentTimeMillis()
+//                        runOnUiThread {
+//                            menuButton.isEnabled = true
+//                            menuButton.visibility = View.VISIBLE
+//                        }
+//                        val frameData = jsonObject.getString("data")
+//                        val bitmap = decodeBase64ToBitmap(frameData)
+//
+//                        bitmap?.let {
+//                            withContext(Dispatchers.Main) {
+//                                imageView.setImageBitmap(it)
+//                                imageView.visibility = ImageView.VISIBLE
+//                                applyImageTransform()
+//                            }
+//                        }
+//                    }
                     "monitors_info" -> {
                         val monitorsCount = jsonObject.getInt("monitors_count")
                         val monitorsArray = jsonObject.getJSONArray("monitors")
@@ -462,6 +500,97 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun connectToWebSocket(uri: URI) {
+        lastFrameTime = System.currentTimeMillis()
+        startFrameTimeoutChecker()
+        currentMonitor = 1
+
+        navigationView.setNavigationItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+
+                R.id.menu_desktop_1 -> {
+                    websocketClient?.switchDesktop(1)
+                    currentMonitor = 1
+                }
+                R.id.menu_desktop_2 -> {
+                    websocketClient?.switchDesktop(2)
+                    currentMonitor = 2
+                }
+                R.id.menu_desktop_3 -> {
+                    websocketClient?.switchDesktop(3)
+                    currentMonitor = 3
+                }
+                R.id.menu_disconnect -> disconnectFromWebSocket()
+                R.id.Keyboard -> Keyboard()
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
+
+        websocketJob = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d(TAG, "Подключаюсь к $uri...")
+
+                websocketClient = WebSocketClient(uri, object : WebSocketClient.Listener {
+                    override fun onMessage(message: String) {
+                        handleWebSocketMessage(message)
+                    }
+
+                    override fun onBinaryMessage(data: ByteArray) {
+                        lastFrameTime = System.currentTimeMillis()
+                        runOnUiThread {
+//                            text.text = ""
+//                            text.visibility = View.GONE
+                            button.disable()
+                            menuButton.enable()
+                            keyboardButton.enable()
+                        }
+                        val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+
+                        bitmap?.let {
+                            runOnUiThread {
+                                imageView.setImageBitmap(it)
+                                imageView.visibility = ImageView.VISIBLE
+                                applyImageTransform()
+                            }
+                        }
+                    }
+
+                    override fun onClosing(code: Int, reason: String?) {
+                    }
+
+                    override fun onFailure(t: Throwable) {
+                        Log.e(TAG, "Ошибка подключения", t)
+                        runOnUiThread {
+                            text.text = "❌ Ошибка подключения\n${t.message}"
+                            button.text = "Подключиться"
+                            button.isEnabled = true
+                            menuButton.disable()
+                            keyboardButton.disable()
+                            backspaceButton.disable()
+                            keyboardInputField.visibility = View.GONE
+                            keyboardInputField.setText("")
+                        }
+                    }
+                })
+
+                websocketClient?.connect()
+
+                delay(2000)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка при подключении", e)
+                runOnUiThread {
+                    text.text = "❌ Ошибка: ${e.message}"
+                    button.text = "Подключиться"
+                    button.isEnabled = true
+                    menuButton.disable()
+                    keyboardButton.disable()
+                }
+            }
+        }
+    }
+
     //сообщение при оставновке сервера
     private fun handleServerStopped() {
         frameTimeoutJob?.cancel()
@@ -472,10 +601,9 @@ class MainActivity : AppCompatActivity() {
             imageView.setImageBitmap(null)
             imageView.visibility = View.GONE
 
-            text.text = "Связь с сервером потеряна. Пытаемся повторно подключиться"
-            button.isEnabled = false
-            menuButton.isEnabled = false
-            menuButton.visibility = View.GONE
+            text.text = "Связь с сервером потеряна. Повторное подключение..."
+            button.disable()
+            menuButton.disable()
 
             scaleFactor = 1.0f
             posX = 0f
@@ -519,150 +647,18 @@ class MainActivity : AppCompatActivity() {
         val currentMonitorInfo = monitorsInfo.find { it.number == currentMonitor }
 
         if (currentMonitorInfo == null) {
-            Log.e(TAG, "❌ convertToAbsoluteCoords: монитор $currentMonitor не найден в monitorsInfo: ${monitorsInfo.map { it.number }}")
+            Log.e(TAG, "convertToAbsoluteCoords: монитор $currentMonitor не найден в monitorsInfo: ${monitorsInfo.map { it.number }}")
+
             return null
         }
 
         val absoluteX = currentMonitorInfo.left + (normalizedX * currentMonitorInfo.width).toInt()
         val absoluteY = currentMonitorInfo.top + (normalizedY * currentMonitorInfo.height).toInt()
 
-        Log.d(TAG, "📐 Преобразование координат: нормализованные ($normalizedX, $normalizedY) -> абсолютные ($absoluteX, $absoluteY)")
-        Log.d(TAG, "📐 Монитор $currentMonitor: left=${currentMonitorInfo.left}, top=${currentMonitorInfo.top}, width=${currentMonitorInfo.width}, height=${currentMonitorInfo.height}")
+        Log.d(TAG, "Преобразование координат: нормализованные ($normalizedX, $normalizedY) -> абсолютные ($absoluteX, $absoluteY)")
+        Log.d(TAG, "Монитор $currentMonitor: left=${currentMonitorInfo.left}, top=${currentMonitorInfo.top}, width=${currentMonitorInfo.width}, height=${currentMonitorInfo.height}")
 
         return Pair(absoluteX, absoluteY)
-    }
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleGestureDetector.onTouchEvent(event)
-
-        if (scaleGestureDetector.isInProgress) {
-            when (event.actionMasked) {
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    isDragging = false
-                }
-            }
-            return true
-        }
-
-        if (event.pointerCount > 2) {
-            return true
-        }
-
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                lastTouchX = event.x
-                lastTouchY = event.y
-                lastScrollY = event.y
-                isDragging = true
-                dClick = false
-
-                val imageCoords = getImageCoordinates(event.x, event.y)
-                imageCoords?.let { (x, y) ->
-                    Log.d(TAG, "Касание на изображении: X=$x, Y=$y")
-
-                    val currentTime = System.currentTimeMillis()
-
-                    if (currentTime - lastTapTime < DOUBLE_TAP_DELAY) {
-                        dClick = true
-                        cancelLongPress()
-
-                        val absoluteCoords = convertToAbsoluteCoords(x, y)
-                        absoluteCoords?.let { (absX, absY) ->
-                            websocketClient?.sendClick(absX, absY, 0, "down", "click")
-                            Log.d(TAG, "Двойное нажатие - левый клик: X=$absX, Y=$absY down")
-                        }
-                    } else {
-                        startLongPressTimer(x, y)
-                    }
-
-                    lastTapTime = currentTime
-                }
-            }
-
-            MotionEvent.ACTION_MOVE -> {
-                try{
-                    if (isDragging && !dClick) {
-                        val dx = event.x - lastTouchX
-                        val dy = event.y - lastTouchY
-
-                        if (dx > 5 || dx < -5 || dy > 5 || dy < -5) {
-                            cancelLongPress()
-                        }
-
-                        if (!dClick && (scaleFactor == 1f)) {
-                            val scrollDelta = event.y - lastScrollY
-
-                            if (abs(scrollDelta) > scrollThreshold) {
-                                val scrollDirection = if (scrollDelta > 0) "down" else "up"
-
-                                val imageCoords = getImageCoordinates(event.x, event.y)
-                                imageCoords?.let { (x, y) ->
-                                    val absoluteCoords = convertToAbsoluteCoords(x, y)
-                                    absoluteCoords?.let { (absX, absY) ->
-                                        websocketClient?.sendClick(absX, absY, 0, scrollDirection, "wheel")
-                                        Log.d(TAG, "Скролл: $scrollDirection at $absX,$absY")
-                                    }
-                                }
-
-                                lastScrollY = event.y
-                            }
-                        }
-
-                        posX += dx
-                        posY += dy
-                        applyImageTransform()
-
-                        lastTouchX = event.x
-                        lastTouchY = event.y
-                    }
-                } catch (e: Exception){
-                    Log.e(TAG, "Ошибка при скролле", e)
-                }
-            }
-
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                cancelLongPress()
-                isDragging = false
-
-                if (!isLongPressTriggered && dClick) {
-                    val imageCoords = getImageCoordinates(event.x, event.y)
-                    imageCoords?.let { (x, y) ->
-                        Log.d(TAG, "Отпускание на изображении: X=$x, Y=$y")
-                        val absoluteCoords = convertToAbsoluteCoords(x, y)
-                        absoluteCoords?.let { (absX, absY) ->
-                            websocketClient?.sendClick(absX, absY, 0, "up", "click")
-                        }
-                    }
-                }
-                isLongPressTriggered = false
-            }
-        }
-
-        return true
-    }
-    private fun startLongPressTimer(normalizedX: Float, normalizedY: Float) {
-        cancelLongPress()
-
-        longPressRunnable = Runnable {
-            isLongPressTriggered = true
-
-            val absoluteCoords = convertToAbsoluteCoords(normalizedX, normalizedY)
-
-            if (absoluteCoords != null) {
-                val (absX, absY) = absoluteCoords
-                websocketClient?.sendClick(absX, absY, 1, "click", "click")
-                Log.d(TAG, "Долгое нажатие - правый клик: X=$absX, Y=$absY")
-            }
-        }
-
-        handler.postDelayed(longPressRunnable!!, LONG_PRESS_DELAY)
-    }
-
-    private fun cancelLongPress() {
-        longPressRunnable?.let {
-            handler.removeCallbacks(it)
-            longPressRunnable = null
-        }
     }
     private fun getImageCoordinates(screenX: Float, screenY: Float): Pair<Float, Float>? {
         val drawable = imageView.drawable ?: return null
@@ -697,16 +693,16 @@ class MainActivity : AppCompatActivity() {
 
         return Pair(normalizedX, normalizedY)
     }
-    private fun decodeBase64ToBitmap(base64String: String): Bitmap? {
-        return try {
-            val pureBase64 = base64String.substringAfterLast(",")
-            val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка декодирования base64", e)
-            null
-        }
-    }
+//    private fun decodeBase64ToBitmap(base64String: String): Bitmap? {
+//        return try {
+//            val pureBase64 = base64String.substringAfterLast(",")
+//            val decodedBytes = Base64.decode(pureBase64, Base64.DEFAULT)
+//            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+//        } catch (e: Exception) {
+//            Log.e(TAG, "Ошибка декодирования base64", e)
+//            null
+//        }
+//    }
 
     private fun disconnectFromWebSocket() {
         CoroutineScope(Dispatchers.IO).launch {
@@ -717,16 +713,17 @@ class MainActivity : AppCompatActivity() {
                 frameTimeoutJob?.cancel()
 
                 lastFrameTime = 0L
-                delay(50)
+                delay(50.milliseconds)
                 runOnUiThread {
-                    menuButton.visibility = View.GONE
+                    menuButton.disable()
+                    keyboardButton.disable()
+                    backspaceButton.disable()
                     text.text = "Вы оключились"
                     imageView.visibility = ImageView.GONE
-                    button.isEnabled = true
-                    menuButton.isEnabled = false
-                    button.text = "Подключиться"
+                    button.enable()
+                    keyboardInputField.visibility = View.GONE
+                    keyboardInputField.setText("")
                 }
-                Toast.makeText(this@MainActivity, "ПОДТВЕРЖДЕНИЕ", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при отключении", e)
             }
@@ -735,12 +732,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-
-        discovery?.stopDiscovery()
-
         disconnectFromWebSocket()
         websocketJob?.cancel()
         discoveryJob?.cancel()
-        frameTimeoutJob?.cancel()
     }
 }
