@@ -1,7 +1,5 @@
 <resources>
     <string name="app_name">Desktop Controller</string>
-<<<<<<< HEAD
-=======
     <string name="images">Images</string>
     <string name="menu">Menu</string>
     <string name="press_connect">Нажмите для подключения</string>
@@ -9,5 +7,4 @@
     <string name="connect">Подключиться</string>
     <string name="keyboard_pin">⌨️</string>
     <string name="x">X</string>
->>>>>>> miron
 </resources>
