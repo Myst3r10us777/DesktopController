@@ -409,20 +409,12 @@ class StreamerApp:
 
     def setup_ui(self):
         style = ttk.Style()
-<<<<<<< HEAD
-        style.configure("Blue.TFrame", background="#131418")
-        style.configure("Title.TLabel", background="#131418", foreground="#f3f3f3", font=("Segoe UI", 25, "bold"))
-        style.configure("Orange.TLabel", background="#131418", foreground="#0ea3fc", font=("Segoe UI", 15))
-        style.configure("Status.TLabel", background="#131418", foreground="red", font=("Segoe UI", 15))
-        style.configure("Large.TButton", font=("Arial", 15))
-=======
         style.configure("Background.TFrame", background="#131418")
         style.configure("Title.TLabel", background="#131418", foreground="#f3f3f3", font=("Segoe UI", 28, "bold"))
         style.configure("Subtitle.TLabel", background="#131418", foreground="#0ea3fc", font=("Segoe UI", 13))
         style.configure("Info.TLabel", background="#131418", foreground="#888888", font=("Segoe UI", 11))
         style.configure("StatusOn.TLabel", background="#131418", foreground="#4CAF50", font=("Segoe UI", 13, "bold"))
         style.configure("StatusOff.TLabel", background="#131418", foreground="#ff6b6b", font=("Segoe UI", 13, "bold"))
->>>>>>> miron
 
         main_frame = ttk.Frame(self.root, padding="30", style="Background.TFrame")
         main_frame.pack(fill=tk.BOTH)
@@ -430,17 +422,7 @@ class StreamerApp:
         title_label = ttk.Label(main_frame, text="Desktop Controller", style="Title.TLabel")
         title_label.pack()
 
-<<<<<<< HEAD
-        ttk.Label(main_frame, 
-                 text="◆ Как использовать:\nУбедитесь что сервер и клиент находятся в одной сети Wi-Fi\n"
-                      "\n◆ В меню можно:\n• Переключить просматриваемый монитор\n"
-                      "• Вставить текст",
-                 style="Orange.TLabel").pack(pady=5)
-
-        self.toggle_button = ttk.Button(
-=======
         subtitle_label = ttk.Label(
->>>>>>> miron
             main_frame,
             text="Управление компьютером с телефона",
             style="Subtitle.TLabel"
